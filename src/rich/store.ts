@@ -49,7 +49,7 @@ export async function loadRichState(db: IDBDatabase) {
   return { generation, preferences, memory, plans, events };
 }
 
-async function liveLease(db: IDBDatabase, writer: SingleWriter, tx: IDBTransaction) {
+async function liveLease(writer: SingleWriter, tx: IDBTransaction) {
   const lease = await req(tx.objectStore("coordination").get("writer")) as { ownerId?: string; generation?: number; expiresAt?: number } | undefined;
   if (!lease || lease.ownerId !== writer.ownerId || (lease.expiresAt ?? 0) <= Date.now()) throw new Error("STALE_WRITER");
   return lease;
@@ -63,7 +63,7 @@ export async function commitDomain(
   mutate: (stores: { meta: IDBObjectStore; memory: IDBObjectStore; plans: IDBObjectStore }) => void,
 ): Promise<number> {
   const tx = db.transaction(["coordination", "meta", "memory", "plans", "events"], "readwrite");
-  await liveLease(db, writer, tx);
+  await liveLease(writer, tx);
   const meta = tx.objectStore("meta");
   const generation = await req(meta.get("generation")) as GenerationMeta | undefined;
   if (!generation) { tx.abort(); throw new Error("NO_GENERATION"); }
@@ -74,7 +74,11 @@ export async function commitDomain(
   await done(tx); return revision;
 }
 
-export async function savePreferences(db: IDBDatabase, writer: SingleWriter, patch: Partial<Pick<Preferences, "dailyTargetSeconds" | "learningTimeZone" | "examDate">>): Promise<void> {
+export async function commitEventOnly(db: IDBDatabase, writer: SingleWriter, type: string, payload: Record<string, unknown>): Promise<void> {
+  await commitDomain(db, writer, type, payload, () => undefined);
+}
+
+export async function savePreferences(db: IDBDatabase, writer: SingleWriter, patch: Partial<Pick<Preferences, "dailyTargetSeconds" | "learningTimeZone" | "examDate" | "diagnosticCompleted">>): Promise<void> {
   const state = await loadRichState(db); if (!state.preferences || !state.generation) throw new Error("NO_GENERATION");
   const next: Preferences = { ...state.preferences, ...patch, lastAppliedRevision: state.generation.revision + 1 };
   await commitDomain(db, writer, "PreferencesUpdated", patch as Record<string, unknown>, ({ meta }) => meta.put(next));
@@ -86,9 +90,9 @@ export async function saveSkillAndEvent(db: IDBDatabase, writer: SingleWriter, s
   await commitDomain(db, writer, eventType, payload, ({ memory }) => memory.put(next));
 }
 
-export async function savePlan(db: IDBDatabase, writer: SingleWriter, plan: DailyPlanRecord): Promise<void> {
+export async function savePlan(db: IDBDatabase, writer: SingleWriter, plan: DailyPlanRecord, eventType = "DailyPlanUpdated"): Promise<void> {
   const state = await loadRichState(db); if (!state.generation) throw new Error("NO_GENERATION");
-  await commitDomain(db, writer, "DailyPlanCreated", { learningDayId: plan.learningDayId }, ({ plans }) => plans.put({ ...plan, lastAppliedRevision: state.generation!.revision + 1 }));
+  await commitDomain(db, writer, eventType, { learningDayId: plan.learningDayId }, ({ plans }) => plans.put({ ...plan, lastAppliedRevision: state.generation!.revision + 1 }));
 }
 
 async function envelopeWithoutChecksum(db: IDBDatabase, dataVersion: string) {
@@ -133,11 +137,13 @@ export async function loadBackup(snapshotId: string): Promise<ExportEnvelope> {
   return verifyEnvelope(JSON.parse(rows.map((x) => x.content).join("")));
 }
 
-export async function replaceGeneration(db: IDBDatabase, source: ExportEnvelope | null, dataVersion: string, origin: "import" | "restore" | "reset"): Promise<void> {
+export async function replaceGeneration(db: IDBDatabase, writer: SingleWriter, source: ExportEnvelope | null, dataVersion: string, origin: "import" | "restore" | "reset"): Promise<void> {
   const now = new Date().toISOString(); const generationId = uuid();
   const generation: GenerationMeta = { key: "generation", generationId, revision: 1, createdAt: now, origin, dataVersion, registryCount: 623, coreCount: 241 };
   const prefs: Preferences = source ? { ...source.preferences, generationId, lastAppliedRevision: 1 } : { key: "preferences", generationId, dailyTargetSeconds: DAY_TARGET, learningTimeZone: "Europe/London", examDate: null, diagnosticCompleted: false, lastAppliedRevision: 1 };
-  const tx = db.transaction(["meta", "memory", "plans", "events"], "readwrite"); const memory = tx.objectStore("memory"), plans = tx.objectStore("plans"), events = tx.objectStore("events");
+  const tx = db.transaction(["coordination", "meta", "memory", "plans", "events"], "readwrite");
+  await liveLease(writer, tx);
+  const memory = tx.objectStore("memory"), plans = tx.objectStore("plans"), events = tx.objectStore("events");
   memory.clear(); plans.clear(); events.clear(); tx.objectStore("meta").put(generation); tx.objectStore("meta").put(prefs);
   let revision = 1; events.put({ key: `domain:${generationId}:1`, generationId, revision: 1, type: "GenerationStarted", at: now, payload: { origin } } satisfies DomainEvent);
   if (source) {
