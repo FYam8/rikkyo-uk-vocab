@@ -11,6 +11,7 @@ export function newCard(now = new Date()): Card {
   return createEmptyCard(now);
 }
 
+export type FsrsCard = Card;
 export type SchedulableRating = Rating.Again | Rating.Hard | Rating.Good | Rating.Easy;
 
 export function schedule(card: Card, rating: SchedulableRating, now = new Date()): Card {
