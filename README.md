@@ -4,9 +4,9 @@
 
 ## Current status
 
-Phase 22 Previewです。UI / Storage / deploy基盤を公開できますが、Phase 17の正式な `manifest`、623 stable-ID Registry、Core 241 app-dataはこのrepositoryにまだ接続されていません。その間はData Gateが実学習開始を停止します。架空の教材データは入れません。
+Phase 22 PreviewのUIと機能構成はそのままに、Phase 17の正式なCore 241データと623 stable-ID Registryを接続しています。UIや学習機能の追加変更は行わず、データ接続だけを反映しています。
 
-Productionへ進む前に、正式bundleを `public/data/runtime-bundle.json` として接続し、Capability Adapter mappingが241/241になる必要があります。stable IDは再発行しません。
+Core 241は `public/data/` に配置し、runtime adapterが241/241の整合性を確認してから読み込みます。stable IDは再発行しません。
 
 ## Commands
 
@@ -16,7 +16,7 @@ pnpm run check
 pnpm run dev
 ```
 
-GitHub Pagesのbase pathは `/rikkyo-uk-vocab/` です。`main`へのpushまたは手動実行でPreview workflowがbuild/test後にPages artifactをdeployします。
+GitHub Pagesのbase pathは `/rikkyo-uk-vocab/` です。`main`へのpushまたは手動実行でworkflowがbuild/test後にPages artifactをdeployします。
 
 ## Frozen scheduler settings
 
