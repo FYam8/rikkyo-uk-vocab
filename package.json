@@ -1,0 +1,26 @@
+{
+  "name": "rikkyo-uk-vocab",
+  "private": true,
+  "version": "0.22.0-preview.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "check": "pnpm run build && pnpm run test",
+    "qa:browser": "node qa/browser-qa.mjs"
+  },
+  "dependencies": {
+    "ts-fsrs": "5.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "typescript": "5.8.3",
+    "vite": "6.3.5",
+    "vitest": "3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

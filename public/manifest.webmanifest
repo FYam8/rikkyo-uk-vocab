@@ -1,0 +1,10 @@
+{
+  "name": "Rikkyo UK Vocab",
+  "short_name": "Rikkyo Vocab",
+  "start_url": "/rikkyo-uk-vocab/",
+  "scope": "/rikkyo-uk-vocab/",
+  "display": "standalone",
+  "background_color": "#f5f0e6",
+  "theme_color": "#0d3b32",
+  "lang": "ja"
+}
