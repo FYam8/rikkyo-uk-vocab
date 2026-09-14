@@ -4,13 +4,23 @@ import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./run
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
 import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, stateKey } from "./rich/planner";
-import { commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadBackup, loadRichState, replaceGeneration, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
-import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState } from "./rich/types";
+import { clearActiveSession, commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
+import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord } from "./rich/types";
 import { homeView, questionView, settingsView, statsView, wordsView, type Route } from "./rich/views";
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
 interface Ctx { bundle: RuntimeBundle; db: IDBDatabase; writer: SingleWriter; writable: boolean; }
-interface Session { mode: "study" | "diagnostic"; queue: QuestionRun[]; index: number; feedback?: { rating: string; answer: string }; shownAt: number; diagnostics: Array<{ correct: boolean }>; }
+interface Session {
+  generationId: string;
+  sessionId: string;
+  startedAt: string;
+  mode: "study" | "diagnostic";
+  queue: QuestionRun[];
+  index: number;
+  feedback?: { rating: string; answer: string };
+  shownAt: number;
+  diagnostics: Array<{ correct: boolean }>;
+}
 let ctx: Ctx | null = null;
 let session: Session | null = null;
 let wordQuery = "";
@@ -76,6 +86,23 @@ async function state() {
   if (!s.plans.some((x) => x.key === plan.key) && ctx.writable) await savePlan(ctx.db, ctx.writer, plan, "DailyPlanCreated");
   return { generation, preferences, memory: s.memory, plans: s.plans, events: s.events, plan };
 }
+function activeSessionRecord(resumeIndex: number): Omit<StoredSessionRecord, "lastAppliedRevision"> {
+  if (!session) throw new Error("NO_SESSION");
+  return {
+    key: "active-session",
+    generationId: session.generationId,
+    sessionId: session.sessionId,
+    mode: session.mode,
+    queue: session.queue,
+    resumeIndex,
+    startedAt: session.startedAt,
+    updatedAt: new Date().toISOString(),
+  };
+}
+async function checkpointSession(resumeIndex: number, eventType = "SessionCheckpointed") {
+  if (!ctx || !session || !ctx.writable) return;
+  await saveActiveSession(ctx.db, ctx.writer, activeSessionRecord(resumeIndex), eventType);
+}
 
 async function renderHome() {
   if (!ctx) return;
@@ -121,14 +148,19 @@ async function startStudy() {
   const plan = effectivePlan(s.plan, s.preferences, s.memory);
   const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), 60);
   if (!items.length) return alert("現在出題できる項目はありません。");
-  session = { mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x)), index: 0, shownAt: Date.now(), diagnostics: [] };
+  const now = new Date().toISOString();
+  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x)), index: 0, shownAt: Date.now(), diagnostics: [] };
+  await checkpointSession(0, "SessionStarted");
   location.hash = "study";
   await renderQuestion();
 }
 async function startDiagnostic() {
   if (!ctx?.writable) return alert("別タブが学習Writerです。");
+  const s = await state();
   const questions = buildDiagnostic(ctx.bundle);
-  session = { mode: "diagnostic", queue: questions, index: 0, shownAt: Date.now(), diagnostics: [] };
+  const now = new Date().toISOString();
+  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "diagnostic", queue: questions, index: 0, shownAt: Date.now(), diagnostics: [] };
+  await checkpointSession(0, "SessionStarted");
   location.hash = "diagnostic";
   await renderQuestion();
 }
@@ -136,6 +168,7 @@ async function renderQuestion() {
   if (!ctx || !session) return;
   if (session.index >= session.queue.length) {
     if (session.mode === "diagnostic") await finishDiagnostic();
+    await clearActiveSession(ctx.db, ctx.writer, "completed");
     session = null;
     location.hash = "home";
     return renderHome();
@@ -144,7 +177,12 @@ async function renderQuestion() {
   const e = entity(q.stableId);
   root.innerHTML = questionView(q, e, session.index, session.queue.length, session.mode, session.feedback);
   document.querySelector("#speak-word")?.addEventListener("click", () => speak(e.lemma));
-  document.querySelector("#stop-session")?.addEventListener("click", () => { session = null; location.hash = "home"; });
+  document.querySelector("#stop-session")?.addEventListener("click", () => void (async () => {
+    if (!ctx) return;
+    await clearActiveSession(ctx.db, ctx.writer, "user-stop");
+    session = null;
+    location.hash = "home";
+  })());
   document.querySelector("#next-question")?.addEventListener("click", () => {
     if (!session) return;
     session.index += 1;
@@ -168,21 +206,22 @@ async function answer(given: string) {
   const rating = q.choices.length ? (given === q.answer ? "Good" : "Again") : gradeInput(given, q.answer);
   const correct = rating !== "Again";
   const s = await state();
+  const eventBase = { sessionId: session.sessionId, questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey };
 
   if (session.mode === "diagnostic") {
     session.diagnostics.push({ correct });
     if (correct) {
       const provisional = provisionalFromDiagnostic(s.generation.generationId, q.stableId, q.skillKey, now);
-      await saveSkillAndEvent(ctx.db, ctx.writer, provisional, "DiagnosticAnswer", { questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey, correct: true, diagnostic: true });
+      await saveSkillAndEvent(ctx.db, ctx.writer, provisional, "DiagnosticAnswer", { ...eventBase, correct: true, diagnostic: true });
     } else {
-      await commitEventOnly(ctx.db, ctx.writer, "DiagnosticAnswer", { questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey, correct: false, diagnostic: true, noLapse: true, noMemoryMutation: true });
+      await commitEventOnly(ctx.db, ctx.writer, "DiagnosticAnswer", { ...eventBase, correct: false, diagnostic: true, noLapse: true, noMemoryMutation: true });
     }
   } else {
     const key = stateKey(q.stableId, q.skillKey);
     let prev = s.memory.find((x) => x.key === key);
     if (!prev) prev = createInitialState(s.generation.generationId, q.stableId, q.skillKey, now);
     const next = applyStudyAnswer(prev, rating, now);
-    await saveSkillAndEvent(ctx.db, ctx.writer, next, "AnswerCommitted", { questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey, rating, lane: q.lane });
+    await saveSkillAndEvent(ctx.db, ctx.writer, next, "AnswerCommitted", { ...eventBase, rating, lane: q.lane });
     let plan = s.plan;
     const seconds = Math.max(1, Math.min(90, Math.round((Date.now() - session.shownAt) / 1000)));
     const introduced = new Set(plan.introducedStableIds);
@@ -191,15 +230,20 @@ async function answer(given: string) {
     if ((plan.activeStudySeconds ?? 0) >= plan.targetSeconds) plan.acquisitionClosed = true;
     await savePlan(ctx.db, ctx.writer, plan);
   }
+  await checkpointSession(session.index + 1);
   session.feedback = { rating, answer: q.answer };
   await renderQuestion();
 }
 async function finishDiagnostic() {
-  if (!ctx) return;
+  if (!ctx || !session) return;
   await savePreferences(ctx.db, ctx.writer, { diagnosticCompleted: true });
-  await commitEventOnly(ctx.db, ctx.writer, "DiagnosticCompleted", { answered: session?.diagnostics.length ?? 0, correct: session?.diagnostics.filter((x) => x.correct).length ?? 0 });
+  await commitEventOnly(ctx.db, ctx.writer, "DiagnosticCompleted", { sessionId: session.sessionId, answered: session.diagnostics.length, correct: session.diagnostics.filter((x) => x.correct).length });
 }
 
+function assertCurrentDataVersion(dataVersion: string) {
+  if (!ctx) throw new Error("NO_CONTEXT");
+  if (dataVersion !== ctx.bundle.manifest.dataVersion) throw new Error(`この版では dataVersion ${dataVersion} の自動移行は未対応です。現在版は ${ctx.bundle.manifest.dataVersion} です。`);
+}
 function bindSettings() {
   if (!ctx) return;
   document.querySelector("#settings-form")?.addEventListener("submit", async (ev) => {
@@ -227,23 +271,58 @@ function bindSettings() {
     try {
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-import");
       const e = await verifyEnvelope(JSON.parse(await f.text()));
+      assertCurrentDataVersion(e.dataVersion);
       await replaceGeneration(ctx!.db, ctx!.writer, e, ctx!.bundle.manifest.dataVersion, "import");
       location.reload();
     } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   });
   document.querySelectorAll<HTMLButtonElement>(".restore-backup").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("このバックアップへ復元しますか？現在状態は先にバックアップします。")) return;
-    await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-restore");
-    const e = await loadBackup(b.dataset.id!);
-    await replaceGeneration(ctx!.db, ctx!.writer, e, ctx!.bundle.manifest.dataVersion, "restore");
-    location.reload();
+    try {
+      await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-restore");
+      const e = await loadBackup(b.dataset.id!);
+      assertCurrentDataVersion(e.dataVersion);
+      await replaceGeneration(ctx!.db, ctx!.writer, e, ctx!.bundle.manifest.dataVersion, "restore");
+      location.reload();
+    } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   }));
   document.querySelector("#reset-data")?.addEventListener("click", async () => {
     if (!confirm("学習履歴をリセットしますか？安全バックアップを作成してから新しい世代を開始します。")) return;
-    await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-reset");
-    await replaceGeneration(ctx!.db, ctx!.writer, null, ctx!.bundle.manifest.dataVersion, "reset");
-    location.reload();
+    try {
+      await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-reset");
+      await replaceGeneration(ctx!.db, ctx!.writer, null, ctx!.bundle.manifest.dataVersion, "reset");
+      location.reload();
+    } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   });
+}
+
+async function recoverSession(initialEvents: DomainEvent[], generationId: string) {
+  if (!ctx?.writable) return;
+  const stored = await loadActiveSession(ctx.db);
+  if (!stored) return;
+  if (stored.generationId !== generationId) {
+    await clearActiveSession(ctx.db, ctx.writer, "stale-generation");
+    return;
+  }
+  let resumeIndex = stored.resumeIndex;
+  while (resumeIndex < stored.queue.length && graded.has(stored.queue[resumeIndex]!.questionInstanceId)) resumeIndex += 1;
+  if (resumeIndex >= stored.queue.length) {
+    await clearActiveSession(ctx.db, ctx.writer, "completed-recovered");
+    return;
+  }
+  const diagnosticEvents = initialEvents.filter((e) => e.type === "DiagnosticAnswer" && e.payload.sessionId === stored.sessionId);
+  session = {
+    generationId: stored.generationId,
+    sessionId: stored.sessionId,
+    startedAt: stored.startedAt,
+    mode: stored.mode,
+    queue: stored.queue,
+    index: resumeIndex,
+    shownAt: Date.now(),
+    diagnostics: diagnosticEvents.map((e) => ({ correct: e.payload.correct === true })),
+  };
+  location.hash = stored.mode;
+  await checkpointSession(resumeIndex, "SessionResumed");
 }
 
 async function boot() {
@@ -256,13 +335,14 @@ async function boot() {
   const writer = new SingleWriter(db);
   const writable = await writer.acquire();
   if (writable) writer.startHeartbeat();
-  await ensureGeneration(db, bundle.manifest.dataVersion, bundle.registry.length, bundle.core.length);
+  const generation = await ensureGeneration(db, bundle.manifest.dataVersion, bundle.registry.length, bundle.core.length);
   ctx = { bundle, db, writer, writable };
   const s = await loadRichState(db);
   for (const e of s.events) {
     const q = e.payload?.questionInstanceId;
     if (typeof q === "string") graded.add(q);
   }
+  await recoverSession(s.events, generation.generationId);
   window.addEventListener("hashchange", () => void renderRoute());
   window.addEventListener("pagehide", () => { writer.close(); db.close(); }, { once: true });
   if ("serviceWorker" in navigator && import.meta.env.PROD) navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(console.error);
