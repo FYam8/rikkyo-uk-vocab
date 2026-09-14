@@ -11,5 +11,14 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "tests", "src/config.ts", "src/runtime.ts"]
+  "include": [
+    "vite.config.ts",
+    "tests",
+    "src/config.ts",
+    "src/runtime.ts",
+    "src/fsrsAdapter.ts",
+    "src/rich/types.ts",
+    "src/rich/planner.ts",
+    "src/rich/diagnostic.ts"
+  ]
 }
