@@ -1,0 +1,43 @@
+name: Verify restored Phase 22
+
+on:
+  push:
+    branches: [restore/full-phase22]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify Phase 17 Core data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          base = Path('public/data')
+          manifest = json.loads((base/'manifest.json').read_text(encoding='utf-8'))
+          registry = json.loads((base/'registry.json').read_text(encoding='utf-8'))
+          rows = []
+          for name in manifest['chunks']:
+              rows.extend(json.loads((base/name).read_text(encoding='utf-8')))
+          assert manifest['appId'] == 'rikkyo-uk-vocab'
+          assert manifest['dataVersion'] == '0.22.1-core'
+          assert manifest['generatedFromPhase'] == 17
+          assert len(registry) == 623 and len(set(registry)) == 623
+          assert len(rows) == 241 and len({r[0] for r in rows}) == 241
+          print('Core Runtime Gate: 241/241 PASS')
+          print('Stable Registry: 623/623 PASS')
+          PY
+      - run: pnpm run check
