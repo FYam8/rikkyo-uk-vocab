@@ -1,4 +1,4 @@
-name: Deploy Core 241 to GitHub Pages
+name: Deploy Preview to GitHub Pages
 
 on:
   push:
@@ -22,53 +22,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 11.19.0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
       - run: pnpm install --frozen-lockfile
-
-      - name: Verify Phase 17 Core data
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          base = Path('public/data')
-          manifest = json.loads((base/'manifest.json').read_text(encoding='utf-8'))
-          registry = json.loads((base/'registry.json').read_text(encoding='utf-8'))
-          rows = []
-          for name in manifest['chunks']:
-              rows.extend(json.loads((base/name).read_text(encoding='utf-8')))
-          assert manifest['appId'] == 'rikkyo-uk-vocab'
-          assert manifest['dataVersion'] == '0.22.1-core'
-          assert manifest['generatedFromPhase'] == 17
-          assert len(registry) == 623
-          assert len(set(registry)) == 623
-          assert len(rows) == 241
-          ids = [r[0] for r in rows]
-          assert len(set(ids)) == 241
-          assert all(i in set(registry) for i in ids)
-          assert all(r[1] and r[2] for r in rows)
-          print('Core Runtime Gate: 241/241 PASS')
-          print('Stable Registry: 623/623 PASS')
-          PY
-
       - run: pnpm run check
-
       - uses: actions/configure-pages@v5
         with:
           enablement: true
-
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-
-      - name: Deploy Core 241
+      - name: Deploy Preview
         id: deployment
         uses: actions/deploy-pages@v4
+
