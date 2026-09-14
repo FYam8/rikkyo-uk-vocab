@@ -32,9 +32,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
       - name: Deploy Preview
         id: deployment
         uses: actions/deploy-pages@v4
+
