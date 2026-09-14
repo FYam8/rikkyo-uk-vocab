@@ -29,10 +29,10 @@ export interface RuntimeBundle {
   core: RuntimeEntity[];
 }
 
-interface CompactManifest extends RuntimeBundle["manifest"] {
+type CompactManifest = RuntimeBundle["manifest"] & {
   registryVersion?: string;
   chunks: string[];
-}
+};
 
 type CompactRow = [
   stableId: string,
