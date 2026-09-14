@@ -1,7 +1,7 @@
 import type { Card } from "ts-fsrs";
 
 export type SkillKey = "meaningRecognition" | "formProduction";
-export type Stage = "learning" | "review" | "relearning" | "provisional";
+export type Stage = "learning" | "review" | "relearning" | "provisional" | "acquisitionCandidate";
 export type Lane = "learning" | "relearning" | "provisional" | "review" | "acquisition";
 export type RatingName = "Again" | "Hard" | "Good";
 
@@ -40,7 +40,11 @@ export interface DailyPlanRecord {
   createdAt: string;
   targetSeconds: number;
   acquisitionCap: number;
+  newEntityCap?: number;
+  acquisitionBudget?: number;
+  acquisitionUsed?: number;
   introducedStableIds: string[];
+  introducedSkillKeys?: string[];
   acquisitionClosed: boolean;
   activeStudySeconds?: number;
   lastAppliedRevision: number;
