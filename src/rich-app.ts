@@ -62,17 +62,19 @@ function effectivePlan(plan: DailyPlanRecord, prefs: Preferences, memory: SkillS
 async function state() {
   if (!ctx) throw new Error("NO_CONTEXT");
   const s = await loadRichState(ctx.db);
-  if (!s.generation || !s.preferences) throw new Error("NO_GENERATION");
-  const day = learningDayId(new Date(), s.preferences.learningTimeZone);
+  const generation = s.generation;
+  const preferences = s.preferences;
+  if (!generation || !preferences) throw new Error("NO_GENERATION");
+  const day = learningDayId(new Date(), preferences.learningTimeZone);
   let plan = ensurePlan(
-    s.generation.generationId,
-    s.preferences.dailyTargetSeconds,
+    generation.generationId,
+    preferences.dailyTargetSeconds,
     s.plans.find((x) => x.learningDayId === day),
-    s.preferences.learningTimeZone,
+    preferences.learningTimeZone,
   );
-  plan = effectivePlan(plan, s.preferences, s.memory);
+  plan = effectivePlan(plan, preferences, s.memory);
   if (!s.plans.some((x) => x.key === plan.key) && ctx.writable) await savePlan(ctx.db, ctx.writer, plan, "DailyPlanCreated");
-  return { ...s, plan };
+  return { generation, preferences, memory: s.memory, plans: s.plans, events: s.events, plan };
 }
 
 async function renderHome() {
@@ -170,7 +172,7 @@ async function answer(given: string) {
   if (session.mode === "diagnostic") {
     session.diagnostics.push({ correct });
     if (correct) {
-      const provisional = provisionalFromDiagnostic(s.generation!.generationId, q.stableId, q.skillKey, now);
+      const provisional = provisionalFromDiagnostic(s.generation.generationId, q.stableId, q.skillKey, now);
       await saveSkillAndEvent(ctx.db, ctx.writer, provisional, "DiagnosticAnswer", { questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey, correct: true, diagnostic: true });
     } else {
       await commitEventOnly(ctx.db, ctx.writer, "DiagnosticAnswer", { questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey, correct: false, diagnostic: true, noLapse: true, noMemoryMutation: true });
@@ -178,7 +180,7 @@ async function answer(given: string) {
   } else {
     const key = stateKey(q.stableId, q.skillKey);
     let prev = s.memory.find((x) => x.key === key);
-    if (!prev) prev = createInitialState(s.generation!.generationId, q.stableId, q.skillKey, now);
+    if (!prev) prev = createInitialState(s.generation.generationId, q.stableId, q.skillKey, now);
     const next = applyStudyAnswer(prev, rating, now);
     await saveSkillAndEvent(ctx.db, ctx.writer, next, "AnswerCommitted", { questionInstanceId: q.questionInstanceId, stableId: q.stableId, skillKey: q.skillKey, rating, lane: q.lane });
     let plan = s.plan;
