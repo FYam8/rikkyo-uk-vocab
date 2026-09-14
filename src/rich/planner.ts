@@ -16,13 +16,31 @@ function stableNumber(text: string): number { let h = 2166136261; for (const c o
 function skillsFor(entity: RuntimeEntity): SkillKey[] { return entity.quizEligible === false ? [] : entity.capabilities.includes("spelling") ? ["meaningRecognition", "formProduction"] : ["meaningRecognition"]; }
 
 export function ensurePlan(generationId: string, targetSeconds: number, existing?: DailyPlanRecord, timeZone = "Europe/London", now = new Date()): DailyPlanRecord {
-  const day = learningDayId(now, timeZone); if (existing?.learningDayId === day && existing.generationId === generationId) return existing;
-  return { key: `plan:${generationId}:${day}`, generationId, learningDayId: day, createdAt: now.toISOString(), targetSeconds, acquisitionCap: 12, introducedStableIds: [], acquisitionClosed: false, activeStudySeconds: 0, lastAppliedRevision: 0 };
+  const day = learningDayId(now, timeZone);
+  if (existing?.learningDayId === day && existing.generationId === generationId) return existing;
+  return {
+    key: `plan:${generationId}:${day}`,
+    generationId,
+    learningDayId: day,
+    createdAt: now.toISOString(),
+    targetSeconds,
+    acquisitionCap: 12,
+    newEntityCap: 12,
+    acquisitionBudget: 12,
+    acquisitionUsed: 0,
+    introducedStableIds: [],
+    introducedSkillKeys: [],
+    acquisitionClosed: false,
+    activeStudySeconds: 0,
+    lastAppliedRevision: 0,
+  };
 }
 
 export interface PlannedItem { entity: RuntimeEntity; skillKey: SkillKey; lane: Lane; state?: SkillState; }
 export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: DailyPlanRecord, now = new Date(), limit = 60): PlannedItem[] {
-  const byKey = new Map(memory.map((x) => [x.key, x])); const nowMs = now.getTime(); const items: PlannedItem[] = [];
+  const byKey = new Map(memory.map((x) => [x.key, x]));
+  const nowMs = now.getTime();
+  const items: PlannedItem[] = [];
   for (const entity of bundle.core) for (const skillKey of skillsFor(entity)) {
     const state = byKey.get(stateKey(entity.stableId, skillKey));
     if (state?.stage === "learning" && Date.parse(state.dueAt) <= nowMs) items.push({ entity, skillKey, lane: "learning", state });
@@ -32,14 +50,38 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
   }
   const laneRank: Record<Lane, number> = { learning: 0, relearning: 1, provisional: 2, review: 3, acquisition: 4 };
   items.sort((a, b) => laneRank[a.lane] - laneRank[b.lane] || Date.parse(a.state?.dueAt ?? "0") - Date.parse(b.state?.dueAt ?? "0") || priority(a.entity) - priority(b.entity) || stableNumber(a.entity.stableId) - stableNumber(b.entity.stableId));
-  if (!plan.acquisitionClosed) {
-    const introduced = new Set(plan.introducedStableIds); const activeEntities = new Set(memory.map((x) => x.stableId));
-    const candidates = bundle.core.filter((e) => e.quizEligible !== false && (!activeEntities.has(e.stableId) || skillsFor(e).some((s) => !byKey.has(stateKey(e.stableId, s))))).sort((a, b) => priority(a) - priority(b) || stableNumber(`${plan.learningDayId}:${a.stableId}`) - stableNumber(`${plan.learningDayId}:${b.stableId}`));
+
+  if (!plan.acquisitionClosed && items.length < limit) {
+    const introduced = new Set(plan.introducedStableIds);
+    const introducedSkills = new Set(plan.introducedSkillKeys ?? []);
+    const activeEntities = new Set(memory.filter((x) => x.stage !== "provisional" && x.stage !== "acquisitionCandidate").map((x) => x.stableId));
+    const newEntityCap = plan.newEntityCap ?? 12;
+    const storedBudget = plan.acquisitionBudget ?? plan.acquisitionCap;
+    const budgetLimit = Math.min(storedBudget, plan.acquisitionCap);
+    let remainingBudget = Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
+    const candidates = bundle.core
+      .filter((e) => e.quizEligible !== false && skillsFor(e).some((s) => {
+        const existing = byKey.get(stateKey(e.stableId, s));
+        return !existing || existing.stage === "acquisitionCandidate";
+      }))
+      .sort((a, b) => priority(a) - priority(b) || stableNumber(`${plan.learningDayId}:${a.stableId}`) - stableNumber(`${plan.learningDayId}:${b.stableId}`));
+
     for (const entity of candidates) {
-      if (items.length >= limit) break; const isNewEntity = !activeEntities.has(entity.stableId);
-      if (isNewEntity && !introduced.has(entity.stableId) && introduced.size >= plan.acquisitionCap) continue;
-      const skillKey = skillsFor(entity).find((s) => !byKey.has(stateKey(entity.stableId, s))); if (!skillKey) continue;
-      items.push({ entity, skillKey, lane: "acquisition" }); if (isNewEntity) introduced.add(entity.stableId);
+      if (items.length >= limit || remainingBudget <= 0) break;
+      const skillKey = skillsFor(entity).find((s) => {
+        const existing = byKey.get(stateKey(entity.stableId, s));
+        return !existing || existing.stage === "acquisitionCandidate";
+      });
+      if (!skillKey) continue;
+      const skillToken = stateKey(entity.stableId, skillKey);
+      if (introducedSkills.has(skillToken)) continue;
+      const isNewEntity = !activeEntities.has(entity.stableId);
+      if (isNewEntity && !introduced.has(entity.stableId) && introduced.size >= newEntityCap) continue;
+      const state = byKey.get(skillToken);
+      items.push({ entity, skillKey, lane: "acquisition", ...(state ? { state } : {}) });
+      remainingBudget -= 1;
+      introducedSkills.add(skillToken);
+      if (isNewEntity) introduced.add(entity.stableId);
     }
   }
   return items.slice(0, limit);
@@ -50,14 +92,21 @@ export function createInitialState(generationId: string, stableId: string, skill
 }
 
 export function applyStudyAnswer(previous: SkillState, rating: "Again" | "Hard" | "Good", now = new Date()): SkillState {
-  const correct = rating !== "Again"; const next: SkillState = { ...previous, correct: previous.correct + (correct ? 1 : 0), wrong: previous.wrong + (correct ? 0 : 1), lastSeenAt: now.toISOString() };
+  const correct = rating !== "Again";
+  const next: SkillState = { ...previous, correct: previous.correct + (correct ? 1 : 0), wrong: previous.wrong + (correct ? 0 : 1), lastSeenAt: now.toISOString() };
   if (previous.stage === "provisional") {
-    if (!correct) return { ...next, stage: "learning", stepIndex: 0, card: null, episodeId: crypto.randomUUID(), dueAt: new Date(now.getTime() + LEARNING_STEPS[0]!).toISOString(), provisionalUntil: null };
-    const card = schedule(newCard(now), Rating.Good, now); return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null, provisionalUntil: null };
+    if (!correct) return { ...next, stage: "acquisitionCandidate", stepIndex: 0, card: null, episodeId: null, dueAt: now.toISOString(), provisionalUntil: null };
+    const card = schedule(newCard(now), Rating.Good, now);
+    return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null, provisionalUntil: null };
+  }
+  if (previous.stage === "acquisitionCandidate") {
+    const stage: SkillState = { ...next, stage: "learning", stepIndex: 0, card: null, episodeId: crypto.randomUUID(), provisionalUntil: null, dueAt: now.toISOString() };
+    if (!correct) return { ...stage, dueAt: new Date(now.getTime() + LEARNING_STEPS[0]!).toISOString() };
+    return { ...stage, stepIndex: 1, dueAt: new Date(now.getTime() + LEARNING_STEPS[1]!).toISOString() };
   }
   if (previous.stage === "review") {
     const card = schedule(previous.card ?? newCard(now), rating === "Again" ? Rating.Again : rating === "Hard" ? Rating.Hard : Rating.Good, now);
-    if (rating === "Again") return { ...next, stage: "relearning", card: previous.card, stepIndex: 0, lapses: previous.lapses + 1, episodeId: crypto.randomUUID(), dueAt: new Date(now.getTime() + RELEARNING_STEPS[0]!).toISOString() };
+    if (rating === "Again") return { ...next, stage: "relearning", card, stepIndex: 0, lapses: previous.lapses + 1, episodeId: crypto.randomUUID(), dueAt: new Date(now.getTime() + RELEARNING_STEPS[0]!).toISOString() };
     return { ...next, card, dueAt: card.due.toISOString() };
   }
   const steps = previous.stage === "relearning" ? RELEARNING_STEPS : LEARNING_STEPS;
@@ -65,16 +114,21 @@ export function applyStudyAnswer(previous: SkillState, rating: "Again" | "Hard" 
   const stepIndex = previous.stepIndex + 1;
   if (stepIndex < steps.length) return { ...next, stepIndex, dueAt: new Date(now.getTime() + steps[stepIndex]!).toISOString() };
   if (previous.stage === "relearning") {
-    const card = schedule(previous.card ?? newCard(now), Rating.Good, now); return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null };
+    const card = previous.card ?? schedule(newCard(now), Rating.Again, now);
+    return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null };
   }
-  const card = schedule(newCard(now), Rating.Good, now); return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null };
+  const card = schedule(newCard(now), Rating.Good, now);
+  return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null };
 }
 
 function distractors(bundle: RuntimeBundle, entity: RuntimeEntity): string[] {
-  const answer = entity.senses[0]?.glossJa ?? ""; const pool = bundle.core.map((x) => x.senses[0]?.glossJa ?? "").filter((x, i, a) => x && x !== answer && a.indexOf(x) === i).sort((a, b) => stableNumber(`${entity.stableId}:${a}`) - stableNumber(`${entity.stableId}:${b}`)); return pool.slice(0, 3);
+  const answer = entity.senses[0]?.glossJa ?? "";
+  const pool = bundle.core.map((x) => x.senses[0]?.glossJa ?? "").filter((x, i, a) => x && x !== answer && a.indexOf(x) === i).sort((a, b) => stableNumber(`${entity.stableId}:${a}`) - stableNumber(`${entity.stableId}:${b}`));
+  return pool.slice(0, 3);
 }
 export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem): QuestionRun {
-  const meaning = item.entity.senses[0]?.glossJa ?? ""; const id = crypto.randomUUID();
+  const meaning = item.entity.senses[0]?.glossJa ?? "";
+  const id = crypto.randomUUID();
   if (item.skillKey === "formProduction") return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, prompt: meaning, choices: [], answer: item.entity.lemma };
   const choices = [meaning, ...distractors(bundle, item.entity)].sort((a, b) => stableNumber(`${id}:${a}`) - stableNumber(`${id}:${b}`));
   return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, prompt: item.entity.lemma, choices, answer: meaning };
@@ -82,5 +136,8 @@ export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem): Question
 
 export function normalizeAnswer(value: string): string { return value.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " "); }
 export function gradeInput(given: string, answer: string): "Good" | "Hard" | "Again" {
-  const a = normalizeAnswer(given), b = normalizeAnswer(answer); if (a === b) return "Good"; if (a && (b.startsWith(a) || a.startsWith(b)) && Math.abs(a.length - b.length) <= 2) return "Hard"; return "Again";
+  const a = normalizeAnswer(given), b = normalizeAnswer(answer);
+  if (a === b) return "Good";
+  if (a && (b.startsWith(a) || a.startsWith(b)) && Math.abs(a.length - b.length) <= 2) return "Hard";
+  return "Again";
 }
