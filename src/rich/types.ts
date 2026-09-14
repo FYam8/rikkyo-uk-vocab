@@ -76,6 +76,18 @@ export interface QuestionRun {
   answer: string;
 }
 
+export interface StoredSessionRecord {
+  key: "active-session";
+  generationId: string;
+  sessionId: string;
+  mode: "study" | "diagnostic";
+  queue: QuestionRun[];
+  resumeIndex: number;
+  startedAt: string;
+  updatedAt: string;
+  lastAppliedRevision: number;
+}
+
 export interface ExportEnvelope {
   appId: "rikkyo-uk-vocab";
   exportFormat: "rikkyo-uk-vocab-export/v1";
