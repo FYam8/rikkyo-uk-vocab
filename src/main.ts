@@ -1,9 +1,18 @@
 import "./styles.css";
 import { APP_ID, CORE_ENTITY_COUNT, REGISTRY_ENTITY_COUNT, SCHEDULER_CONFIG } from "./config";
-import { loadRuntimeBundle, type GateReport } from "./runtime";
+import { loadRuntimeBundle, type GateReport, type RuntimeBundle } from "./runtime";
 import { openStudyDb, runStorageProbe, SingleWriter } from "./storage";
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
+
+function esc(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 function shell(content: string): string {
   return `<header class="masthead"><a class="brand" href="./" aria-label="Rikkyo UK Vocab home"><span class="crest">R</span><span><b>RIKKYO UK</b><small>VOCABULARY STUDIO</small></span></a><span class="preview-pill">PREVIEW</span></header><main>${content}</main><footer>Phase 22 Preview · ${APP_ID}</footer>`;
@@ -30,7 +39,50 @@ function gateView(gate: GateReport): string {
 }
 
 function studyView(): string {
-  return shell(`<section class="hero"><div class="eyebrow">TODAY</div><h1>今日の学習</h1><p class="lead">Runtime data gate passed.</p><button class="primary" id="start-study">学習を始める</button></section>`);
+  return shell(`<section class="hero"><div class="eyebrow">TODAY</div><h1>今日の学習</h1><p class="lead">Core 241の教材データを読み込み済みです。</p><button class="primary" id="start-study">学習を始める</button></section>`);
+}
+
+function renderStudyHome(bundle: RuntimeBundle): void {
+  root.innerHTML = studyView();
+  document.querySelector<HTMLButtonElement>("#start-study")?.addEventListener("click", () => {
+    renderStudyCard(bundle, 0, false);
+  });
+}
+
+function renderStudyCard(bundle: RuntimeBundle, index: number, revealed: boolean): void {
+  const entity = bundle.core[index];
+  if (!entity) {
+    root.innerHTML = shell(`<section class="hero"><div class="eyebrow">COMPLETE</div><h1>学習完了</h1><p class="lead">Core 241を最後まで確認しました。</p><button class="primary" id="back-home">今日の学習へ戻る</button></section>`);
+    document.querySelector<HTMLButtonElement>("#back-home")?.addEventListener("click", () => renderStudyHome(bundle));
+    return;
+  }
+
+  const meaning = entity.senses[0]?.glossJa ?? "";
+  root.innerHTML = shell(`
+    <section class="hero">
+      <div class="eyebrow">CORE 241 · ${index + 1} / ${bundle.core.length}</div>
+      <h1>${esc(entity.lemma)}</h1>
+      <p class="lead">${revealed ? esc(meaning) : "意味を思い出してから答えを確認してください。"}</p>
+      <div class="status-card">
+        <div class="status-icon" aria-hidden="true">${revealed ? "✓" : "?"}</div>
+        <div>
+          <span class="label">${revealed ? "ANSWER" : "FLASH CARD"}</span>
+          <h2>${revealed ? esc(meaning) : esc(entity.pos)}</h2>
+          <p>${revealed ? `stable ID: ${esc(entity.stableId)}` : "答えを見るまで日本語の意味は表示しません。"}</p>
+        </div>
+      </div>
+      <button class="primary" id="study-action">${revealed ? (index + 1 < bundle.core.length ? "次の単語" : "学習を終える") : "意味を見る"}</button>
+      <p><a class="text-link" id="study-home" href="#">← 今日の学習へ戻る</a></p>
+    </section>`);
+
+  document.querySelector<HTMLButtonElement>("#study-action")?.addEventListener("click", () => {
+    if (!revealed) renderStudyCard(bundle, index, true);
+    else renderStudyCard(bundle, index + 1, false);
+  });
+  document.querySelector<HTMLAnchorElement>("#study-home")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    renderStudyHome(bundle);
+  });
 }
 
 async function qaView(): Promise<void> {
@@ -62,8 +114,9 @@ async function boot(): Promise<void> {
   const qa = new URLSearchParams(location.search).get("qa");
   if (qa === "storage") return qaView();
   if (qa === "writer") return qaWriterView();
-  const { gate } = await loadRuntimeBundle(import.meta.env.BASE_URL);
-  root.innerHTML = gate.ok ? studyView() : gateView(gate);
+  const { bundle, gate } = await loadRuntimeBundle(import.meta.env.BASE_URL);
+  if (gate.ok && bundle) renderStudyHome(bundle);
+  else root.innerHTML = gateView(gate);
   try {
     const db = await openStudyDb();
     const writer = new SingleWriter(db);
