@@ -1,4 +1,4 @@
-const CACHE_NAME = "rikkyo-uk-vocab-preview-v1";
+const CACHE_NAME = "rikkyo-uk-vocab-adaptive-v2";
 const SCOPE = "/rikkyo-uk-vocab/";
 
 self.addEventListener("install", (event) => {
@@ -18,7 +18,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE)) return;
-  if (url.pathname.endsWith("/data/runtime-bundle.json")) return;
   event.respondWith(fetch(event.request).then((response) => {
     if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
     return response;
