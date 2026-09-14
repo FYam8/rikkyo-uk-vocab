@@ -7,17 +7,17 @@ const LEARNING_STEPS = [1 * MINUTE, 10 * MINUTE];
 const RELEARNING_STEPS = [1 * MINUTE, 10 * MINUTE];
 
 export function stateKey(stableId: string, skillKey: SkillKey): string { return `skill:${stableId}:${skillKey}`; }
-export function learningDayId(at = new Date()): string {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" });
+export function learningDayId(at = new Date(), timeZone = "Europe/London"): string {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
   return f.format(at);
 }
 function priority(entity: RuntimeEntity): number { return entity.priority === "S" ? 0 : entity.priority === "A" ? 1 : entity.priority === "B" ? 2 : 3; }
 function stableNumber(text: string): number { let h = 2166136261; for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 function skillsFor(entity: RuntimeEntity): SkillKey[] { return entity.quizEligible === false ? [] : entity.capabilities.includes("spelling") ? ["meaningRecognition", "formProduction"] : ["meaningRecognition"]; }
 
-export function ensurePlan(generationId: string, targetSeconds: number, existing?: DailyPlanRecord): DailyPlanRecord {
-  const day = learningDayId(); if (existing?.learningDayId === day && existing.generationId === generationId) return existing;
-  return { key: `plan:${generationId}:${day}`, generationId, learningDayId: day, createdAt: new Date().toISOString(), targetSeconds, acquisitionCap: 12, introducedStableIds: [], acquisitionClosed: false, lastAppliedRevision: 0 };
+export function ensurePlan(generationId: string, targetSeconds: number, existing?: DailyPlanRecord, timeZone = "Europe/London", now = new Date()): DailyPlanRecord {
+  const day = learningDayId(now, timeZone); if (existing?.learningDayId === day && existing.generationId === generationId) return existing;
+  return { key: `plan:${generationId}:${day}`, generationId, learningDayId: day, createdAt: now.toISOString(), targetSeconds, acquisitionCap: 12, introducedStableIds: [], acquisitionClosed: false, activeStudySeconds: 0, lastAppliedRevision: 0 };
 }
 
 export interface PlannedItem { entity: RuntimeEntity; skillKey: SkillKey; lane: Lane; state?: SkillState; }
