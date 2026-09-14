@@ -42,6 +42,7 @@ export interface DailyPlanRecord {
   acquisitionCap: number;
   introducedStableIds: string[];
   acquisitionClosed: boolean;
+  activeStudySeconds: number;
   lastAppliedRevision: number;
 }
 
