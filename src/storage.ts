@@ -10,6 +10,30 @@ export interface WriterLease {
   expiresAt: number;
 }
 
+export interface StudyMemory {
+  key: string;
+  stableId: string;
+  card: unknown;
+  correct: number;
+  wrong: number;
+  lastSeenAt: string;
+  dueAt: string;
+  lastResult: "correct" | "wrong";
+}
+
+export interface StudyEventRecord {
+  key: string;
+  ownerId: string;
+  writerGeneration: number;
+  payload: {
+    type?: string;
+    stableId?: string;
+    correct?: boolean;
+    answeredAt?: string;
+    [key: string]: unknown;
+  };
+}
+
 export function openStudyDb(dbName: string = DB_NAME): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, DB_VERSION);
@@ -39,6 +63,28 @@ function get<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefined>
     request.onsuccess = () => resolve(request.result as T | undefined);
     request.onerror = () => reject(request.error);
   });
+}
+
+function getAll<T>(store: IDBObjectStore): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result as T[]);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function readStudyMemory(db: IDBDatabase): Promise<Map<string, StudyMemory>> {
+  const tx = db.transaction("memory", "readonly");
+  const rows = await getAll<StudyMemory>(tx.objectStore("memory"));
+  await txDone(tx);
+  return new Map(rows.map((row) => [row.stableId, row]));
+}
+
+export async function readStudyEvents(db: IDBDatabase): Promise<StudyEventRecord[]> {
+  const tx = db.transaction("events", "readonly");
+  const rows = await getAll<StudyEventRecord>(tx.objectStore("events"));
+  await txDone(tx);
+  return rows;
 }
 
 export class SingleWriter {
@@ -93,19 +139,36 @@ export class SingleWriter {
     this.timer = undefined;
   }
 
-  async commitEvent(eventId: string, payload: unknown): Promise<void> {
-    const tx = this.db.transaction(["coordination", "events"], "readwrite");
+  private async checkedTransaction(storeNames: string[]): Promise<{ tx: IDBTransaction; lease: WriterLease }> {
+    const tx = this.db.transaction(["coordination", ...storeNames], "readwrite");
     const lease = await get<WriterLease>(tx.objectStore("coordination"), "writer");
     if (!lease || lease.ownerId !== this.ownerId || lease.generation !== this.generation || lease.expiresAt <= Date.now()) {
       tx.abort();
       throw new Error("STALE_WRITER");
     }
+    return { tx, lease };
+  }
+
+  async commitEvent(eventId: string, payload: unknown): Promise<void> {
+    const { tx, lease } = await this.checkedTransaction(["events"]);
     const events = tx.objectStore("events");
     if (await get(events, eventId)) {
       tx.abort();
       throw new Error("DUPLICATE_EVENT");
     }
-    events.put({ key: eventId, ownerId: this.ownerId, writerGeneration: this.generation, payload });
+    events.put({ key: eventId, ownerId: this.ownerId, writerGeneration: lease.generation, payload });
+    await txDone(tx);
+  }
+
+  async commitReview(eventId: string, payload: StudyEventRecord["payload"], memory: StudyMemory): Promise<void> {
+    const { tx, lease } = await this.checkedTransaction(["events", "memory"]);
+    const events = tx.objectStore("events");
+    if (await get(events, eventId)) {
+      tx.abort();
+      throw new Error("DUPLICATE_EVENT");
+    }
+    events.put({ key: eventId, ownerId: this.ownerId, writerGeneration: lease.generation, payload });
+    tx.objectStore("memory").put(memory);
     await txDone(tx);
   }
 
