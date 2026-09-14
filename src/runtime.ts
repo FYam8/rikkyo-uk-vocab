@@ -9,6 +9,12 @@ export interface RuntimeEntity {
   senses: Array<{ senseId: string; glossJa: string }>;
   capabilities: Capability[];
   prompts: Partial<Record<Capability, unknown[]>>;
+  priority?: "S" | "A" | "B" | "C" | string;
+  studyLayer?: string;
+  targetBand?: string;
+  schedules?: string[];
+  quizEligible?: boolean;
+  diagnosticEligible?: boolean;
 }
 
 export interface RuntimeBundle {
@@ -22,6 +28,24 @@ export interface RuntimeBundle {
   registry: Array<{ stableId: string }>;
   core: RuntimeEntity[];
 }
+
+interface CompactManifest extends RuntimeBundle["manifest"] {
+  registryVersion?: string;
+  chunks: string[];
+}
+
+type CompactRow = [
+  stableId: string,
+  lemma: string,
+  meaningJa: string,
+  pos: string | null,
+  priority: string,
+  studyLayer: string,
+  targetBand: string,
+  schedules: string[],
+  quizEligible: boolean,
+  diagnosticEligible: boolean,
+];
 
 export interface GateReport {
   ok: boolean;
@@ -77,19 +101,65 @@ export function validateRuntimeBundle(value: unknown): GateReport {
   return { ok: reasons.length === 0, reasons: [...new Set(reasons)], mappedCore, expectedCore: CORE_ENTITY_COUNT };
 }
 
+function rowToEntity(row: CompactRow): RuntimeEntity {
+  const [stableId, lemma, meaningJa, pos, priority, studyLayer, targetBand, schedules, quizEligible, diagnosticEligible] = row;
+  const capabilities: Capability[] = quizEligible ? ["recognition", "spelling"] : ["recognition"];
+  return {
+    stableId,
+    lemma,
+    pos: pos ?? "phrase",
+    senses: [{ senseId: `${stableId}::main`, glossJa: meaningJa }],
+    capabilities,
+    prompts: {
+      recognition: [{ kind: "english-to-japanese" }],
+      ...(quizEligible ? { spelling: [{ kind: "japanese-to-english" }] } : {}),
+    },
+    priority,
+    studyLayer,
+    targetBand,
+    schedules,
+    quizEligible,
+    diagnosticEligible,
+  };
+}
+
 export async function loadRuntimeBundle(baseUrl: string): Promise<{ bundle: RuntimeBundle | null; gate: GateReport }> {
   try {
-    const response = await fetch(`${baseUrl}data/runtime-bundle.json`, { cache: "no-store" });
-    if (!response.ok) throw new Error(String(response.status));
-    const bundle = await response.json() as RuntimeBundle;
+    const manifestResponse = await fetch(`${baseUrl}data/manifest.json`, { cache: "no-store" });
+    if (!manifestResponse.ok) throw new Error(`manifest:${manifestResponse.status}`);
+    const manifest = await manifestResponse.json() as CompactManifest;
+    if (!Array.isArray(manifest.chunks) || manifest.chunks.length === 0) throw new Error("chunks");
+
+    const registryResponse = await fetch(`${baseUrl}data/registry.json`, { cache: "no-store" });
+    if (!registryResponse.ok) throw new Error(`registry:${registryResponse.status}`);
+    const stableIds = await registryResponse.json() as string[];
+
+    const chunkRows = await Promise.all(manifest.chunks.map(async (chunk) => {
+      const response = await fetch(`${baseUrl}data/${chunk}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${chunk}:${response.status}`);
+      return response.json() as Promise<CompactRow[]>;
+    }));
+
+    const bundle: RuntimeBundle = {
+      manifest: {
+        appId: manifest.appId,
+        dataVersion: manifest.dataVersion,
+        registryEntityCount: manifest.registryEntityCount,
+        coreEntityCount: manifest.coreEntityCount,
+        generatedFromPhase: manifest.generatedFromPhase,
+      },
+      registry: stableIds.map((stableId) => ({ stableId })),
+      core: chunkRows.flat().map(rowToEntity),
+    };
     const gate = validateRuntimeBundle(bundle);
     return { bundle: gate.ok ? bundle : null, gate };
-  } catch {
+  } catch (error) {
+    console.error("Runtime bundle load failed", error);
     return {
       bundle: null,
       gate: {
         ok: false,
-        reasons: ["Phase 17のmanifest / 623 stable-ID Registry / Core 241 app-dataが未接続です。"],
+        reasons: ["Core 241教材データを読み込めませんでした。"],
         mappedCore: 0,
         expectedCore: CORE_ENTITY_COUNT,
       },
