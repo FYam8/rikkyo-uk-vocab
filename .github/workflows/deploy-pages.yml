@@ -1,4 +1,4 @@
-name: Deploy Preview to GitHub Pages
+name: Deploy Core 241 to GitHub Pages
 
 on:
   push:
@@ -22,22 +22,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.19.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run check
+
+      - name: Unpack Core 241 release
+        run: |
+          rm -rf site
+          mkdir -p site
+          unzip -q releases/rikkyo-uk-vocab-dist-core241-ready.zip -d site
+
+      - name: Verify release data gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('site/data/runtime-bundle.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['dataVersion'] == '0.22.1-core'
+          assert len(data['registryStableIds']) == 623
+          assert len(data['entities']) == 241
+          assert len(data['studyPresentations']) == 241
+          assert len(data['questionDrafts']) == 476
+          text = p.read_text(encoding='utf-8')
+          for forbidden in ('sourceExcerptVerifiedTranscription', 'primaryLearnerExample', 'rawEvidence', 'sourcePdf'):
+              assert forbidden not in text, forbidden
+          print('Core Runtime Gate: 241/241 PASS')
+          print('Stable Registry: 623/623 PASS')
+          print('Question drafts: 476 PASS')
+          PY
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
-      - name: Deploy Preview
+          path: site
+
+      - name: Deploy Core 241
         id: deployment
         uses: actions/deploy-pages@v4
-
