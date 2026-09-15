@@ -70,10 +70,10 @@ describe("adaptive Phase 22 planner", () => {
     expect(good2.card).not.toBeNull();
   });
 
-  it("returns failed provisional confirmation to acquisition learning rather than lapse", () => {
+  it("returns failed provisional confirmation to acquisition candidate rather than lapse", () => {
     const provisional = provisionalFromDiagnostic("g1", "rik-test", "formProduction", new Date("2026-09-14T12:00:00Z"));
     const failed = applyStudyAnswer(provisional, "Again", new Date("2026-09-15T12:00:00Z"));
-    expect(failed.stage).toBe("learning");
+    expect(failed.stage).toBe("acquisitionCandidate");
     expect(failed.lapses).toBe(0);
     expect(failed.card).toBeNull();
   });
