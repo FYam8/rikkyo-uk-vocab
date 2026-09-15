@@ -30,8 +30,8 @@ function bundle(): RuntimeBundle {
 describe("adaptive Phase 22 planner", () => {
   it("uses the configured learning timezone for the day boundary", () => {
     const at = new Date("2026-01-01T00:30:00Z");
-    expect(learningDayId(at, "America/New_York")).toBe("12/31/2025");
-    expect(learningDayId(at, "Asia/Tokyo")).toBe("01/01/2026");
+    expect(learningDayId(at, "America/New_York")).toBe("2025-12-31");
+    expect(learningDayId(at, "Asia/Tokyo")).toBe("2026-01-01");
   });
 
   it("creates a persisted daily plan with a 12-new-entity cap", () => {
