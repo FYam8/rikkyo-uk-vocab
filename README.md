@@ -4,13 +4,18 @@
 
 ## 公開版
 
-Core 241の正式Phase 17データを接続した学習版をGitHub Pagesへ自動公開します。
+Core 241の正式Phase 17データを接続し、Phase 18〜22で設計した適応学習機能を復元した学習版をGitHub Pagesへ自動公開します。
 
 - Core release: **241 entities**
 - Stable-ID Registry: **623 IDs**
 - Data version: **0.22.1-core**
-- Question drafts: **476**
 - Scheduler: **FSRS-6 / ts-fsrs 5.4.2 / desired retention 0.90 / fuzz off / short-term FSRS off**
+- Memory key: **stableId × skillKey**
+- Learning lanes: **learning / relearning / provisional / review / acquisition**
+- Initial diagnostic: **maximum 24 questions**
+- Storage: **IndexedDB + Single Writer fencing**
+- Recovery: **Export / Import / Browser Backup / Restore / Reset generation**
+- Session: **questionInstanceId duplicate-grade protection + resumable session state**
 
 公開URL: https://fyam8.github.io/rikkyo-uk-vocab/
 
@@ -18,14 +23,14 @@ Core 241の正式Phase 17データを接続した学習版をGitHub Pagesへ自�
 
 公開artifactには学習に必要な公開可能フィールドだけを含めます。過去問PDF、raw evidence、source-derived example textは含めません。stable IDは再発行しません。
 
-## Release artifact
+## Release checks
 
-Pages workflowは `releases/rikkyo-uk-vocab-dist-core241-ready.zip` を展開し、次を検証した上で公開します。
+Pages workflowは公開前に次を検証します。
 
 - 241 / 241 Core entity
 - 623 / 623 stable-ID Registry
-- 241 study presentations
-- 476 question drafts
-- source-derived example / raw evidence leakageなし
+- TypeScript production build
+- automated tests
+- adaptive queue / short-term learning / diagnostic policy
 
-現在の公開版はPhase 22 Core 241 ready buildです。
+現在の公開版はPhase 22 Core 241 adaptive buildです。
