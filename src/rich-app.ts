@@ -44,6 +44,21 @@ function writerOwnerId(): string {
   return created;
 }
 
+async function ensureWritable(): Promise<boolean> {
+  if (!ctx) return false;
+  try {
+    if (ctx.writable && await ctx.writer.heartbeat()) return true;
+    ctx.writable = false;
+    if (!await ctx.writer.acquire()) await ctx.writer.takeOver();
+    ctx.writable = true;
+    ctx.writer.startHeartbeat();
+    return true;
+  } catch (error) {
+    console.error("Writer handoff failed", error);
+    return false;
+  }
+}
+
 function route(): Route {
   const r = location.hash.replace("#", "") as Route;
   return ["home", "study", "diagnostic", "words", "stats", "analysis", "settings"].includes(r) ? r : "home";
@@ -149,8 +164,12 @@ async function renderHome() {
   document.querySelector("#start-study")?.addEventListener("click", () => void startStudy());
   document.querySelector("#start-diagnostic")?.addEventListener("click", () => void startDiagnostic());
   const mode = document.querySelector<HTMLSelectElement>("#study-mode"), size = document.querySelector<HTMLSelectElement>("#session-size");
-  mode?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { studyMode: mode.value as StudyMode }));
-  size?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { sessionSize: Number(size.value) }));
+  mode?.addEventListener("change", () => void (async () => {
+    if (await ensureWritable()) await savePreferences(ctx!.db, ctx!.writer, { studyMode: mode.value as StudyMode });
+  })());
+  size?.addEventListener("change", () => void (async () => {
+    if (await ensureWritable()) await savePreferences(ctx!.db, ctx!.writer, { sessionSize: Number(size.value) });
+  })());
 }
 async function renderWords() {
   if (!ctx) return;
@@ -190,7 +209,7 @@ async function renderRoute() {
 }
 
 async function startStudy() {
-  if (!ctx?.writable) return alert("別タブが学習Writerです。別タブを閉じて再読み込みしてください。");
+  if (!await ensureWritable() || !ctx) return;
   const s = await state();
   const plan = effectivePlan(s.plan, s.preferences, s.memory);
   const requested = s.preferences.sessionSize ?? 20;
@@ -205,7 +224,7 @@ async function startStudy() {
   await renderQuestion();
 }
 async function startDiagnostic() {
-  if (!ctx?.writable) return alert("別タブが学習Writerです。");
+  if (!await ensureWritable() || !ctx) return;
   const s = await state();
   const questions = buildDiagnostic(ctx.bundle);
   const now = new Date().toISOString();
@@ -231,13 +250,13 @@ async function renderQuestion() {
   root.innerHTML = questionView(q, e, session.index, session.queue.length, session.mode, { correct: session.correct, wrong: session.wrong, baseTotal: session.baseTotal }, session.feedback);
   document.querySelector("#speak-word")?.addEventListener("click", () => speak(e.lemma));
   document.querySelector("#audio-fallback")?.addEventListener("click", () => void (async () => {
-    if (!session) return;
+    if (!session || !await ensureWritable()) return;
     session.queue[session.index] = removeAudioRequirement(q);
     await checkpointSession(session.index, "AudioQuestionSkipped");
     await renderQuestion();
   })());
   document.querySelector("#stop-session")?.addEventListener("click", () => void (async () => {
-    if (!ctx) return;
+    if (!ctx || !await ensureWritable()) return;
     await clearActiveSession(ctx.db, ctx.writer, "user-stop");
     session = null;
     location.hash = "home";
@@ -257,7 +276,7 @@ async function renderQuestion() {
 }
 
 async function answer(given: string) {
-  if (!ctx || !session) return;
+  if (!ctx || !session || !await ensureWritable()) return;
   const q = session.queue[session.index]!;
   if (graded.has(q.questionInstanceId)) return;
   graded.add(q.questionInstanceId);
@@ -325,7 +344,7 @@ async function answer(given: string) {
   await renderQuestion();
 }
 async function finishDiagnostic() {
-  if (!ctx || !session) return;
+  if (!ctx || !session || !await ensureWritable()) return;
   await savePreferences(ctx.db, ctx.writer, { diagnosticCompleted: true });
   await commitEventOnly(ctx.db, ctx.writer, "DiagnosticCompleted", { sessionId: session.sessionId, answered: session.diagnostics.length, correct: session.diagnostics.filter((x) => x.correct).length });
 }
@@ -348,6 +367,7 @@ function bindSettings() {
   document.querySelector("#voice-test")?.addEventListener("click", () => speak("vocabulary"));
   document.querySelector("#settings-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    if (!await ensureWritable()) return;
     const min = Number(document.querySelector<HTMLInputElement>("#daily-target")?.value ?? 20);
     const tz = document.querySelector<HTMLInputElement>("#time-zone")?.value || "Europe/London";
     const exam = document.querySelector<HTMLInputElement>("#exam-date")?.value || null;
@@ -367,6 +387,7 @@ function bindSettings() {
     download(`rikkyo-vocab-${Date.now()}.json`, JSON.stringify(e, null, 2));
   });
   document.querySelector("#browser-backup")?.addEventListener("click", async () => {
+    if (!await ensureWritable()) return;
     await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "manual");
     await renderSettings();
   });
@@ -374,6 +395,7 @@ function bindSettings() {
     const f = (ev.currentTarget as HTMLInputElement).files?.[0];
     if (!f) return;
     try {
+      if (!await ensureWritable()) return;
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-import");
       const e = await verifyEnvelope(JSON.parse(await f.text()));
       assertCurrentDataVersion(e.dataVersion);
@@ -384,6 +406,7 @@ function bindSettings() {
   document.querySelectorAll<HTMLButtonElement>(".restore-backup").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("このバックアップへ復元しますか？現在状態は先にバックアップします。")) return;
     try {
+      if (!await ensureWritable()) return;
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-restore");
       const e = await loadBackup(b.dataset.id!);
       assertCurrentDataVersion(e.dataVersion);
@@ -394,6 +417,7 @@ function bindSettings() {
   document.querySelector("#reset-data")?.addEventListener("click", async () => {
     if (!confirm("学習履歴をリセットしますか？安全バックアップを作成してから新しい世代を開始します。")) return;
     try {
+      if (!await ensureWritable()) return;
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-reset");
       await replaceGeneration(ctx!.db, ctx!.writer, null, datasetIdentity(), "reset");
       location.reload();
@@ -458,6 +482,10 @@ async function boot() {
   }
   const db = await openStudyDb();
   const writer = new SingleWriter(db, undefined, writerOwnerId());
+  writer.onSuperseded(() => {
+    if (!ctx || ctx.writer !== writer) return;
+    ctx.writable = false;
+  });
   const writable = await writer.acquire();
   if (writable) writer.startHeartbeat();
   const generation = await ensureGeneration(db, bundle.manifest.dataVersion, bundle.registry.length, bundle.core.length);

@@ -9,10 +9,21 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.5.1" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
   if (await page.locator("#schedule-filter").count()) throw new Error("A/B schedule output filter must not be shown");
+
+  const contender = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const contenderDialogs = [];
+  contender.on("dialog", async (dialog) => { contenderDialogs.push(dialog.message()); await dialog.dismiss(); });
+  await contender.goto(baseURL, { waitUntil: "networkidle" });
+  await contender.getByRole("button", { name: "学習を始める" }).click();
+  await contender.locator(".study-card").waitFor();
+  await contender.locator("#stop-session").click();
+  await contender.close();
+  if (contenderDialogs.some((message) => message.includes("別タブ") || message.includes("Writer"))) throw new Error(`writer handoff dialog detected: ${contenderDialogs.join(" / ")}`);
+
   await page.getByRole("link", { name: /一覧/ }).click();
   if (await page.locator('#word-filter option[value="A"], #word-filter option[value="B"]').count()) throw new Error("A/B word filters must not be shown");
   await page.locator("#word-filter").selectOption("challenge");
@@ -22,10 +33,15 @@ try {
   await page.getByText("photosynthesis", { exact: true }).waitFor();
   await page.getByRole("link", { name: /学習/ }).click();
 
+  const writerDialogs = [];
+  const writerDialogHandler = async (dialog) => { writerDialogs.push(dialog.message()); await dialog.dismiss(); };
+  page.on("dialog", writerDialogHandler);
   await page.locator("#session-size").selectOption("10");
   await page.locator("#study-mode").selectOption("exam");
   await page.getByRole("button", { name: "学習を始める" }).click();
   await page.locator("#input-answer").waitFor();
+  page.off("dialog", writerDialogHandler);
+  if (writerDialogs.some((message) => message.includes("別タブ") || message.includes("Writer"))) throw new Error(`writer handoff dialog detected: ${writerDialogs.join(" / ")}`);
   await page.locator("#stop-session").click();
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   await page.getByRole("link", { name: /設定/ }).click();
@@ -169,7 +185,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.0 lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.5.1 writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

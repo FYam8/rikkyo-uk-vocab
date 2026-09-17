@@ -95,10 +95,24 @@ export class SingleWriter {
   private generation = 0;
   private timer: number | undefined;
   private channel: BroadcastChannel | null = null;
+  private supersededHandler: (() => void) | null = null;
 
   constructor(private readonly db: IDBDatabase, channelName: string = BROADCAST_CHANNEL, ownerId: string = crypto.randomUUID()) {
     this.ownerId = ownerId;
-    if (typeof BroadcastChannel !== "undefined") this.channel = new BroadcastChannel(channelName);
+    if (typeof BroadcastChannel !== "undefined") {
+      this.channel = new BroadcastChannel(channelName);
+      this.channel.addEventListener("message", (event: MessageEvent<{ type?: string; ownerId?: string; generation?: number }>) => {
+        const message = event.data;
+        if (message?.type !== "writer-acquired") return;
+        if (message.ownerId === this.ownerId && (message.generation ?? 0) <= this.generation) return;
+        this.stopHeartbeat();
+        this.supersededHandler?.();
+      });
+    }
+  }
+
+  onSuperseded(handler: () => void): void {
+    this.supersededHandler = handler;
   }
 
   async acquire(now = Date.now()): Promise<boolean> {
@@ -117,6 +131,16 @@ export class SingleWriter {
     return true;
   }
 
+  async takeOver(now = Date.now()): Promise<void> {
+    const tx = this.db.transaction("coordination", "readwrite");
+    const store = tx.objectStore("coordination");
+    const current = await get<WriterLease>(store, "writer");
+    this.generation = Math.max(this.generation, current?.generation ?? 0) + 1;
+    store.put({ key: "writer", ownerId: this.ownerId, generation: this.generation, expiresAt: now + LEASE_MS } satisfies WriterLease);
+    await txDone(tx);
+    this.channel?.postMessage({ type: "writer-acquired", ownerId: this.ownerId, generation: this.generation });
+  }
+
   async heartbeat(now = Date.now()): Promise<boolean> {
     const tx = this.db.transaction("coordination", "readwrite");
     const store = tx.objectStore("coordination");
@@ -125,6 +149,7 @@ export class SingleWriter {
       tx.abort();
       try { await txDone(tx); } catch { /* expected */ }
       this.stopHeartbeat();
+      this.supersededHandler?.();
       return false;
     }
     current.expiresAt = now + LEASE_MS;
@@ -187,6 +212,7 @@ export class SingleWriter {
 
   close(): void {
     this.stopHeartbeat();
+    this.supersededHandler = null;
     this.channel?.close();
   }
 }
