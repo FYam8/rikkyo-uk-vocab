@@ -9,11 +9,13 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "今日やること" }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.0.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.1.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
 
-  await page.getByRole("button", { name: "今日の学習を始める" }).click();
+  await page.locator("#session-size").selectOption("10");
+  await page.locator("#study-mode").selectOption("random");
+  await page.getByRole("button", { name: "この設定で始める" }).click();
   await page.locator(".rich-choice").first().dblclick();
   await page.getByRole("button", { name: "次へ" }).waitFor();
   const eventCount = await page.evaluate(async () => new Promise((resolve, reject) => {
@@ -58,6 +60,16 @@ try {
   }));
   if (afterReload.answers !== 1 || afterReload.resumeIndex !== 1) throw new Error(`resume mismatch: ${JSON.stringify(afterReload)}`);
 
+  await page.getByRole("link", { name: "分析" }).click();
+  await page.getByRole("heading", { name: "過去問分析" }).waitFor();
+  await page.getByText("6冊", { exact: true }).waitFor();
+  await page.getByText("235/241", { exact: true }).waitFor();
+
+  await page.getByRole("link", { name: "単語" }).click();
+  await page.locator("#word-search").fill("come up with");
+  await page.getByText("come up with", { exact: true }).click();
+  await page.getByText("立教の出題傾向から生成した例文", { exact: true }).waitFor();
+
   await page.getByRole("link", { name: "設定" }).click();
   await page.getByRole("heading", { name: "設定" }).waitFor();
   const downloadPromise = page.waitForEvent("download");
@@ -98,7 +110,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3 mobile, duplicate-grade, persistence, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.1 parity UI, six-paper evidence, mobile, duplicate-grade, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

@@ -5,8 +5,8 @@ import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
 import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
-import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord } from "./rich/types";
-import { homeView, questionView, settingsView, statsView, wordsView, type Route } from "./rich/views";
+import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, ScheduleFilter, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
+import { analysisView, homeView, questionView, settingsView, statsView, wordsView, type Route } from "./rich/views";
 import { PRODUCT_VERSION, SCHEDULER_CONFIG } from "./config";
 import type { CanonicalReviewPayload } from "./rich/types";
 
@@ -19,7 +19,7 @@ interface Session {
   mode: "study" | "diagnostic";
   queue: QuestionRun[];
   index: number;
-  feedback?: { rating: string; answer: string };
+  feedback?: { rating: string; answer: string; given: string };
   shownAt: number;
   diagnostics: Array<{ correct: boolean }>;
 }
@@ -27,6 +27,7 @@ let ctx: Ctx | null = null;
 let session: Session | null = null;
 let wordQuery = "";
 let wordFilter = "all";
+let activePreferences: Preferences | null = null;
 const graded = new Set<string>();
 const WRITER_OWNER_KEY = "rikkyo-uk-vocab:writer-owner:v3";
 
@@ -40,7 +41,7 @@ function writerOwnerId(): string {
 
 function route(): Route {
   const r = location.hash.replace("#", "") as Route;
-  return ["home", "study", "diagnostic", "words", "stats", "settings"].includes(r) ? r : "home";
+  return ["home", "study", "diagnostic", "words", "stats", "analysis", "settings"].includes(r) ? r : "home";
 }
 function entity(id: string): RuntimeEntity {
   const e = ctx?.bundle.core.find((x) => x.stableId === id);
@@ -51,7 +52,11 @@ function speak(text: string) {
   if (!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-GB";
+  const accent = activePreferences?.accent ?? "auto";
+  u.lang = accent === "us" ? "en-US" : "en-GB";
+  const voices = speechSynthesis.getVoices().filter((v) => /^en[-_]/i.test(v.lang));
+  const selected = voices.find((v) => v.voiceURI === activePreferences?.voiceURI);
+  if (selected) u.voice = selected;
   u.rate = 0.88;
   speechSynthesis.speak(u);
 }
@@ -86,6 +91,8 @@ async function state() {
   const generation = s.generation;
   const preferences = s.preferences;
   if (!generation || !preferences) throw new Error("NO_GENERATION");
+  activePreferences = preferences;
+  applyTheme(preferences.theme ?? "auto");
   const day = learningDayId(new Date(), preferences.learningTimeZone);
   let plan = ensurePlan(
     generation.generationId,
@@ -118,9 +125,13 @@ async function checkpointSession(resumeIndex: number, eventType = "SessionCheckp
 async function renderHome() {
   if (!ctx) return;
   const s = await state();
-  root.innerHTML = homeView({ bundle: ctx.bundle, plan: s.plan, memory: s.memory, answeredToday: todayAnswered(s.events, s.preferences.learningTimeZone), activeSeconds: s.plan.activeStudySeconds ?? 0, diagnosticCompleted: s.preferences.diagnosticCompleted });
+  root.innerHTML = homeView({ bundle: ctx.bundle, plan: s.plan, memory: s.memory, answeredToday: todayAnswered(s.events, s.preferences.learningTimeZone), activeSeconds: s.plan.activeStudySeconds ?? 0, diagnosticCompleted: s.preferences.diagnosticCompleted, preferences: s.preferences });
   document.querySelector("#start-study")?.addEventListener("click", () => void startStudy());
   document.querySelector("#start-diagnostic")?.addEventListener("click", () => void startDiagnostic());
+  const mode = document.querySelector<HTMLSelectElement>("#study-mode"), schedule = document.querySelector<HTMLSelectElement>("#schedule-filter"), size = document.querySelector<HTMLSelectElement>("#session-size");
+  mode?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { studyMode: mode.value as StudyMode }));
+  schedule?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { scheduleFilter: schedule.value as ScheduleFilter }));
+  size?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { sessionSize: Number(size.value) }));
 }
 async function renderWords() {
   if (!ctx) return;
@@ -136,18 +147,24 @@ async function renderStats() {
   const s = await state();
   root.innerHTML = statsView(ctx.bundle, s.memory, s.events);
 }
+async function renderAnalysis() {
+  if (!ctx) return;
+  root.innerHTML = analysisView(ctx.bundle);
+}
 async function renderSettings() {
   if (!ctx) return;
   const s = await state();
   const backups = await listBackups();
   root.innerHTML = settingsView(s.preferences, backups);
   bindSettings();
+  populateVoices(s.preferences);
 }
 async function renderRoute() {
   if (session && route() !== "study" && route() !== "diagnostic") session = null;
   const r = route();
   if (r === "words") return renderWords();
   if (r === "stats") return renderStats();
+  if (r === "analysis") return renderAnalysis();
   if (r === "settings") return renderSettings();
   if ((r === "study" || r === "diagnostic") && session) return renderQuestion();
   return renderHome();
@@ -157,7 +174,8 @@ async function startStudy() {
   if (!ctx?.writable) return alert("別タブが学習Writerです。別タブを閉じて再読み込みしてください。");
   const s = await state();
   const plan = effectivePlan(s.plan, s.preferences, s.memory);
-  const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), 60);
+  const requested = s.preferences.sessionSize ?? 20;
+  const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), requested === 0 ? 60 : requested, { mode: s.preferences.studyMode ?? "recommended", schedule: s.preferences.scheduleFilter ?? "all" });
   if (!items.length) return alert("現在出題できる項目はありません。");
   const now = new Date().toISOString();
   session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x)), index: 0, shownAt: Date.now(), diagnostics: [] };
@@ -263,7 +281,7 @@ async function answer(given: string) {
     await savePlan(ctx.db, ctx.writer, plan);
   }
   await checkpointSession(session.index + 1);
-  session.feedback = { rating, answer: q.answer };
+  session.feedback = { rating, answer: q.answer, given };
   await renderQuestion();
 }
 async function finishDiagnostic() {
@@ -292,9 +310,13 @@ function bindSettings() {
     const min = Number(document.querySelector<HTMLInputElement>("#daily-target")?.value ?? 20);
     const tz = document.querySelector<HTMLInputElement>("#time-zone")?.value || "Europe/London";
     const exam = document.querySelector<HTMLInputElement>("#exam-date")?.value || null;
+    const accent = (document.querySelector<HTMLSelectElement>("#accent")?.value || "auto") as "auto" | "gb" | "us";
+    const voiceURI = document.querySelector<HTMLSelectElement>("#voice")?.value || "";
+    const theme = (document.querySelector<HTMLSelectElement>("#theme")?.value || "auto") as "auto" | "light" | "dark";
     if (min < 5 || min > 120) return alert("1日の目安は5〜120分です。");
     try { new Intl.DateTimeFormat("en", { timeZone: tz }).format(new Date()); } catch { return alert("タイムゾーンが不正です。"); }
-    await savePreferences(ctx!.db, ctx!.writer, { dailyTargetSeconds: min * 60, learningTimeZone: tz, examDate: exam });
+    await savePreferences(ctx!.db, ctx!.writer, { dailyTargetSeconds: min * 60, learningTimeZone: tz, examDate: exam, accent, voiceURI, theme });
+    applyTheme(theme);
     alert("保存しました。");
     await renderSettings();
   });
@@ -335,6 +357,21 @@ function bindSettings() {
       location.reload();
     } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   });
+}
+
+function applyTheme(theme: "auto" | "light" | "dark") {
+  document.documentElement.dataset.theme = theme;
+}
+
+function populateVoices(prefs: Preferences) {
+  const select = document.querySelector<HTMLSelectElement>("#voice");
+  if (!select || !("speechSynthesis" in window)) return;
+  const render = () => {
+    const voices = speechSynthesis.getVoices().filter((v) => /^en[-_]/i.test(v.lang));
+    select.innerHTML = `<option value="">端末の標準音声</option>${voices.map((v) => `<option value="${v.voiceURI.replaceAll('"', '&quot;')}" ${v.voiceURI === prefs.voiceURI ? "selected" : ""}>${v.name} (${v.lang})</option>`).join("")}`;
+  };
+  render();
+  speechSynthesis.addEventListener("voiceschanged", render, { once: true });
 }
 
 async function recoverSession(initialEvents: DomainEvent[], generationId: string) {
