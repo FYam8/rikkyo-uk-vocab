@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeBundle, RuntimeEntity } from "../src/runtime";
 import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, makeQuestion, stateKey } from "../src/rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, retryGap, stateKey } from "../src/rich/planner";
 import type { SkillState } from "../src/rich/types";
 
 function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : "Core"): RuntimeEntity {
@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.2.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.3.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 623, coreEntityCount: 241, generatedFromPhase: 17, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 623 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -100,18 +100,37 @@ describe("adaptive Phase 22 planner", () => {
     expect(stateKey("rik-v-x", "meaningRecognition")).not.toBe(stateKey("rik-v-x", "formProduction"));
   });
 
-  it("supports Waseda-style mode and A/B filtering without changing IDs", () => {
+  it("keeps A/B provenance but does not split the learning queue by schedule", () => {
     const b = bundle();
     const plan = ensurePlan("g1", 1200, undefined, "Europe/London", new Date("2026-09-17T12:00:00Z"));
-    const q = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 20, { mode: "foundation", schedule: "A" });
-    expect(q.length).toBeGreaterThan(0);
-    expect(q.every((x) => x.entity.targetBand === "Foundation" && x.entity.schedules?.includes("A"))).toBe(true);
+    const a = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 20, { mode: "recommended", schedule: "A" });
+    const scheduleB = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 20, { mode: "recommended", schedule: "B" });
+    expect(a.map((x) => x.entity.stableId)).toEqual(scheduleB.map((x) => x.entity.stableId));
   });
 
   it("creates source-aware question variants", () => {
     const b = bundle();
     const item = { entity: b.core[0]!, skillKey: "meaningRecognition" as const, lane: "review" as const, state: { ...createInitialState("g1", b.core[0]!.stableId, "meaningRecognition"), correct: 2 } };
     const q = makeQuestion(b, item);
-    expect(["meaningChoice", "audioChoice", "clozeChoice"]).toContain(q.kind);
+    expect(["meaningChoice", "audioChoice", "clozeChoice", "clozeInput"]).toContain(q.kind);
+  });
+
+  it("uses production and context questions in exam mode without requiring audio", () => {
+    const b = bundle();
+    const plan = ensurePlan("g1", 1200, undefined, "Europe/London", new Date("2026-09-17T12:00:00Z"));
+    const item = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 10, { mode: "exam" })[0]!;
+    const q = makeQuestion(b, item, { intensity: "exam", allowAudio: false });
+    expect(item.skillKey).toBe("formProduction");
+    expect(["input", "clozeInput"]).toContain(q.kind);
+  });
+
+  it("turns a missed input into an objective retry after a Waseda-style gap", () => {
+    const b = bundle(), e = b.core[20]!;
+    const original = makeQuestion(b, { entity: e, skillKey: "formProduction", lane: "review", state: { ...createInitialState("g1", e.stableId, "formProduction"), correct: 3 } }, { intensity: "exam", allowAudio: false });
+    const retry = makeRetryQuestion(b, original, e);
+    expect(retry.kind).toBe("reverseChoice");
+    expect(retry.isRetry).toBe(true);
+    expect(retry.retryOf).toBe(original.questionInstanceId);
+    expect(retryGap(e)).toBe(8);
   });
 });
