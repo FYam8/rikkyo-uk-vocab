@@ -7,6 +7,8 @@ import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInpu
 import { clearActiveSession, commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord } from "./rich/types";
 import { homeView, questionView, settingsView, statsView, wordsView, type Route } from "./rich/views";
+import { PRODUCT_VERSION, SCHEDULER_CONFIG } from "./config";
+import type { CanonicalReviewPayload } from "./rich/types";
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
 interface Ctx { bundle: RuntimeBundle; db: IDBDatabase; writer: SingleWriter; writable: boolean; }
@@ -26,6 +28,15 @@ let session: Session | null = null;
 let wordQuery = "";
 let wordFilter = "all";
 const graded = new Set<string>();
+const WRITER_OWNER_KEY = "rikkyo-uk-vocab:writer-owner:v3";
+
+function writerOwnerId(): string {
+  const current = sessionStorage.getItem(WRITER_OWNER_KEY);
+  if (current) return current;
+  const created = crypto.randomUUID();
+  sessionStorage.setItem(WRITER_OWNER_KEY, created);
+  return created;
+}
 
 function route(): Route {
   const r = location.hash.replace("#", "") as Route;
@@ -212,16 +223,37 @@ async function answer(given: string) {
     session.diagnostics.push({ correct });
     if (correct) {
       const provisional = provisionalFromDiagnostic(s.generation.generationId, q.stableId, q.skillKey, now);
-      await saveSkillAndEvent(ctx.db, ctx.writer, provisional, "DiagnosticAnswer", { ...eventBase, correct: true, diagnostic: true });
+      await saveSkillAndEvent(ctx.db, ctx.writer, provisional, "DiagnosticAnswer", {
+        ...eventBase, eventId: `diagnostic:${session.generationId}:${q.questionInstanceId}`,
+        idempotencyKey: q.questionInstanceId, timestamp: now.toISOString(), correct: true,
+        diagnostic: true, schedulerMetadata: SCHEDULER_CONFIG, createdByRelease: PRODUCT_VERSION,
+      });
     } else {
-      await commitEventOnly(ctx.db, ctx.writer, "DiagnosticAnswer", { ...eventBase, correct: false, diagnostic: true, noLapse: true, noMemoryMutation: true });
+      await commitEventOnly(ctx.db, ctx.writer, "DiagnosticAnswer", {
+        ...eventBase, eventId: `diagnostic:${session.generationId}:${q.questionInstanceId}`,
+        idempotencyKey: q.questionInstanceId, timestamp: now.toISOString(), correct: false,
+        diagnostic: true, noLapse: true, noMemoryMutation: true, schedulerMetadata: SCHEDULER_CONFIG,
+        createdByRelease: PRODUCT_VERSION,
+      });
     }
   } else {
     const key = stateKey(q.stableId, q.skillKey);
     let prev = s.memory.find((x) => x.key === key);
     if (!prev) prev = createInitialState(s.generation.generationId, q.stableId, q.skillKey, now);
     const next = applyStudyAnswer(prev, rating, now);
-    await saveSkillAndEvent(ctx.db, ctx.writer, next, "AnswerCommitted", { ...eventBase, rating, lane: q.lane });
+    const reviewPayload: CanonicalReviewPayload = {
+      ...eventBase,
+      eventId: `review:${session.generationId}:${q.questionInstanceId}`,
+      idempotencyKey: q.questionInstanceId,
+      timestamp: now.toISOString(),
+      result: correct ? "correct" : "wrong",
+      rating,
+      lane: q.lane,
+      schedulerMetadata: SCHEDULER_CONFIG,
+      schedulerCardAfter: next.card,
+      createdByRelease: PRODUCT_VERSION,
+    };
+    await saveSkillAndEvent(ctx.db, ctx.writer, next, "AnswerCommitted", reviewPayload);
     let plan = s.plan;
     const seconds = Math.max(1, Math.min(90, Math.round((Date.now() - session.shownAt) / 1000)));
     const introduced = new Set(plan.introducedStableIds);
@@ -243,6 +275,15 @@ async function finishDiagnostic() {
 function assertCurrentDataVersion(dataVersion: string) {
   if (!ctx) throw new Error("NO_CONTEXT");
   if (dataVersion !== ctx.bundle.manifest.dataVersion) throw new Error(`この版では dataVersion ${dataVersion} の自動移行は未対応です。現在版は ${ctx.bundle.manifest.dataVersion} です。`);
+}
+function datasetIdentity() {
+  if (!ctx) throw new Error("NO_CONTEXT");
+  return {
+    dataVersion: ctx.bundle.manifest.dataVersion,
+    registryCount: ctx.bundle.registry.length,
+    coreCount: ctx.bundle.core.length,
+    currentStableIds: new Set(ctx.bundle.registry.map((x) => x.stableId)),
+  };
 }
 function bindSettings() {
   if (!ctx) return;
@@ -272,7 +313,7 @@ function bindSettings() {
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-import");
       const e = await verifyEnvelope(JSON.parse(await f.text()));
       assertCurrentDataVersion(e.dataVersion);
-      await replaceGeneration(ctx!.db, ctx!.writer, e, ctx!.bundle.manifest.dataVersion, "import");
+      await replaceGeneration(ctx!.db, ctx!.writer, e, datasetIdentity(), "import");
       location.reload();
     } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   });
@@ -282,7 +323,7 @@ function bindSettings() {
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-restore");
       const e = await loadBackup(b.dataset.id!);
       assertCurrentDataVersion(e.dataVersion);
-      await replaceGeneration(ctx!.db, ctx!.writer, e, ctx!.bundle.manifest.dataVersion, "restore");
+      await replaceGeneration(ctx!.db, ctx!.writer, e, datasetIdentity(), "restore");
       location.reload();
     } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   }));
@@ -290,7 +331,7 @@ function bindSettings() {
     if (!confirm("学習履歴をリセットしますか？安全バックアップを作成してから新しい世代を開始します。")) return;
     try {
       await createBackup(ctx!.db, ctx!.bundle.manifest.dataVersion, "before-reset");
-      await replaceGeneration(ctx!.db, ctx!.writer, null, ctx!.bundle.manifest.dataVersion, "reset");
+      await replaceGeneration(ctx!.db, ctx!.writer, null, datasetIdentity(), "reset");
       location.reload();
     } catch (err) { alert(err instanceof Error ? err.message : String(err)); }
   });
@@ -332,7 +373,7 @@ async function boot() {
     return;
   }
   const db = await openStudyDb();
-  const writer = new SingleWriter(db);
+  const writer = new SingleWriter(db, undefined, writerOwnerId());
   const writable = await writer.acquire();
   if (writable) writer.startHeartbeat();
   const generation = await ensureGeneration(db, bundle.manifest.dataVersion, bundle.registry.length, bundle.core.length);

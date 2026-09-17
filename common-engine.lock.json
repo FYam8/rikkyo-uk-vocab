@@ -1,0 +1,10 @@
+{
+  "format": "common-vocab-engine-lock/v1",
+  "version": "1.0.0",
+  "sourceRepository": "FYam8/english-vocab",
+  "sourceCommit": "3e6fcb1701e721ccaf070df915446004f7f312ef",
+  "sourceArtifact": "src/common-engine/session-orchestration.js",
+  "sourceArtifactSha256": "e0510dcae081e852f9002bc5d7f8f1af3aa1af2c57e0254030eacb61d62974b6",
+  "vendoredModule": "src/common-engine/session-orchestration.ts",
+  "hotlink": false
+}

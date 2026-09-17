@@ -3,6 +3,8 @@ name: Deploy Core 241 to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -15,10 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +58,56 @@ jobs:
           print('Stable Registry: 623/623 PASS')
           PY
 
+      - name: Verify v3 release and Common Engine pin
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          release=json.loads(Path('public/release-manifest.json').read_text())
+          lock=json.loads(Path('common-engine.lock.json').read_text())
+          assert release['productVersion']=='3.0.0'
+          assert release['persistenceSchemaVersion']==3
+          assert release['exportFormatVersion']==3
+          assert release['indexedDbVersion']==3
+          assert release['datasetVersion']=='0.22.1-core'
+          assert lock['sourceCommit']=='3e6fcb1701e721ccaf070df915446004f7f312ef'
+          assert lock['hotlink'] is False
+          print('v3 release tuple and Common Engine pin: PASS')
+          PY
+          node --check public/sw.js
+
       - run: pnpm run check
+
+      - name: Install browser runtime
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser QA twice
+        run: |
+          pnpm exec vite preview --host 127.0.0.1 --port 4173 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/rikkyo-uk-vocab/ >/dev/null; then break; fi
+            sleep 1
+          done
+          QA_PASS=CI-CLEAN-1 pnpm run qa:browser
+          QA_PASS=CI-CLEAN-2 pnpm run qa:browser
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-site
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: verify
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-site
+          path: dist
 
       - uses: actions/configure-pages@v5
         with:

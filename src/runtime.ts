@@ -1,4 +1,4 @@
-import { APP_ID, CORE_ENTITY_COUNT, REGISTRY_ENTITY_COUNT } from "./config";
+import { APP_ID, CORE_ENTITY_COUNT, DATASET_VERSION, ENGINE_VERSION, EXPORT_FORMAT_VERSION, INDEXED_DB_VERSION, PERSISTENCE_SCHEMA_VERSION, PRODUCT_VERSION, REGISTRY_ENTITY_COUNT } from "./config";
 
 export type Capability = "recognition" | "meaning" | "spelling" | "context";
 
@@ -18,6 +18,16 @@ export interface RuntimeEntity {
 }
 
 export interface RuntimeBundle {
+  release: {
+    appId: string;
+    productVersion: string;
+    engineVersion: string;
+    datasetVersion: string;
+    persistenceSchemaVersion: number;
+    exportFormatVersion: number;
+    indexedDbVersion: number;
+    commonEngineCommit: string;
+  };
   manifest: {
     appId: string;
     dataVersion: string;
@@ -64,6 +74,14 @@ export function validateRuntimeBundle(value: unknown): GateReport {
     return { ok: false, reasons: ["runtime bundleがありません。"], mappedCore: 0, expectedCore: CORE_ENTITY_COUNT };
   }
   const manifest = data.manifest;
+  const release = data.release;
+  if (release?.appId !== APP_ID) reasons.push("release manifest appIdが一致しません。");
+  if (release?.productVersion !== PRODUCT_VERSION) reasons.push("productVersionが一致しません。");
+  if (release?.engineVersion !== ENGINE_VERSION) reasons.push("engineVersionが一致しません。");
+  if (release?.datasetVersion !== DATASET_VERSION || release.datasetVersion !== manifest?.dataVersion) reasons.push("datasetVersion tupleが一致しません。");
+  if (release?.persistenceSchemaVersion !== PERSISTENCE_SCHEMA_VERSION) reasons.push("persistenceSchemaVersionが一致しません。");
+  if (release?.exportFormatVersion !== EXPORT_FORMAT_VERSION) reasons.push("exportFormatVersionが一致しません。");
+  if (release?.indexedDbVersion !== INDEXED_DB_VERSION) reasons.push("indexedDbVersionが一致しません。");
   if (manifest?.appId !== APP_ID) reasons.push("manifest.appIdが立教専用appIdと一致しません。");
   if (!nonEmpty(manifest?.dataVersion)) reasons.push("manifest.dataVersionがありません。");
   if (manifest?.registryEntityCount !== REGISTRY_ENTITY_COUNT) reasons.push(`Registryは${REGISTRY_ENTITY_COUNT}件である必要があります。`);
@@ -125,6 +143,9 @@ function rowToEntity(row: CompactRow): RuntimeEntity {
 
 export async function loadRuntimeBundle(baseUrl: string): Promise<{ bundle: RuntimeBundle | null; gate: GateReport }> {
   try {
+    const releaseResponse = await fetch(`${baseUrl}release-manifest.json`, { cache: "no-store" });
+    if (!releaseResponse.ok) throw new Error(`release:${releaseResponse.status}`);
+    const release = await releaseResponse.json() as RuntimeBundle["release"];
     const manifestResponse = await fetch(`${baseUrl}data/manifest.json`, { cache: "no-store" });
     if (!manifestResponse.ok) throw new Error(`manifest:${manifestResponse.status}`);
     const manifest = await manifestResponse.json() as CompactManifest;
@@ -141,6 +162,7 @@ export async function loadRuntimeBundle(baseUrl: string): Promise<{ bundle: Runt
     }));
 
     const bundle: RuntimeBundle = {
+      release,
       manifest: {
         appId: manifest.appId,
         dataVersion: manifest.dataVersion,

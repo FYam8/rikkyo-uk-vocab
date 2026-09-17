@@ -1,4 +1,5 @@
-import { APP_ID, BACKUP_DB_NAME, EXPORT_FORMAT } from "../config";
+import { APP_ID, BACKUP_DB_NAME, ENGINE_VERSION, EXPORT_FORMAT, EXPORT_FORMAT_VERSION, PERSISTENCE_SCHEMA_VERSION, PRODUCT_VERSION, RELEASE_TUPLE, SCHEDULER_CONFIG } from "../config";
+import { hydrateCard } from "../fsrsAdapter";
 import type { SingleWriter } from "../storage";
 import type { BackupManifest, DailyPlanRecord, DomainEvent, ExportEnvelope, GenerationMeta, Preferences, SkillState, StoredSessionRecord } from "./types";
 
@@ -22,7 +23,7 @@ async function sha(text: string): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(bytes)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
-function stableJson(value: unknown): string {
+export function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   const o = value as Record<string, unknown>;
@@ -41,9 +42,18 @@ interface LegacyWordMemory {
 
 export async function ensureGeneration(db: IDBDatabase, dataVersion: string, registryCount: number, coreCount: number): Promise<GenerationMeta> {
   const existing = await one<GenerationMeta>(db, "meta", "generation");
-  if (existing) return existing;
+  if (existing) {
+    if (existing.persistenceSchemaVersion === PERSISTENCE_SCHEMA_VERSION) return existing;
+    const upgraded = { ...existing, productVersion: PRODUCT_VERSION, engineVersion: ENGINE_VERSION, persistenceSchemaVersion: PERSISTENCE_SCHEMA_VERSION, createdByRelease: PRODUCT_VERSION };
+    const tx = db.transaction(["meta", "events"], "readwrite");
+    upgraded.revision += 1;
+    tx.objectStore("meta").put(upgraded);
+    tx.objectStore("events").put({ key: `domain:${upgraded.generationId}:${upgraded.revision}`, generationId: upgraded.generationId, revision: upgraded.revision, type: "PersistenceMigrated", at: new Date().toISOString(), payload: { from: existing.persistenceSchemaVersion ?? "pre-v3", to: PERSISTENCE_SCHEMA_VERSION, preservedExistingState: true } } satisfies DomainEvent);
+    await done(tx);
+    return upgraded;
+  }
   const createdAt = new Date().toISOString();
-  const generation: GenerationMeta = { key: "generation", generationId: uuid(), revision: 1, createdAt, origin: "fresh", dataVersion, registryCount, coreCount };
+  const generation: GenerationMeta = { key: "generation", generationId: uuid(), revision: 1, createdAt, origin: "fresh", dataVersion, registryCount, coreCount, productVersion: PRODUCT_VERSION, engineVersion: ENGINE_VERSION, persistenceSchemaVersion: PERSISTENCE_SCHEMA_VERSION, createdByRelease: PRODUCT_VERSION };
   const tx = db.transaction(["meta", "events", "memory"], "readwrite");
   const memoryStore = tx.objectStore("memory");
   const legacy = (await req(memoryStore.getAll()) as LegacyWordMemory[]).filter((row) => row.key?.startsWith("word:") && row.stableId);
@@ -147,7 +157,15 @@ export async function clearActiveSession(db: IDBDatabase, writer: SingleWriter, 
 async function envelopeWithoutChecksum(db: IDBDatabase, dataVersion: string) {
   const s = await loadRichState(db);
   if (!s.generation || !s.preferences) throw new Error("NO_GENERATION");
-  return { appId: APP_ID, exportFormat: EXPORT_FORMAT, exportedAt: new Date().toISOString(), dataVersion, generation: s.generation, preferences: s.preferences, memory: s.memory, plans: s.plans, events: s.events } as const;
+  const activeSession = await loadActiveSession(db) ?? null;
+  return {
+    appId: APP_ID, exportFormat: EXPORT_FORMAT, productVersion: PRODUCT_VERSION, engineVersion: ENGINE_VERSION,
+    datasetVersion: dataVersion, persistenceSchemaVersion: PERSISTENCE_SCHEMA_VERSION,
+    exportFormatVersion: EXPORT_FORMAT_VERSION, createdByRelease: PRODUCT_VERSION,
+    schedulerMetadata: SCHEDULER_CONFIG, exportedAt: new Date().toISOString(), dataVersion,
+    generation: s.generation, preferences: s.preferences, memory: s.memory, plans: s.plans,
+    events: s.events, activeSession,
+  } as const;
 }
 export async function exportEnvelope(db: IDBDatabase, dataVersion: string): Promise<ExportEnvelope> {
   const body = await envelopeWithoutChecksum(db, dataVersion); return { ...body, checksum: await sha(stableJson(body)) } as ExportEnvelope;
@@ -155,9 +173,12 @@ export async function exportEnvelope(db: IDBDatabase, dataVersion: string): Prom
 export async function verifyEnvelope(value: unknown): Promise<ExportEnvelope> {
   const e = value as ExportEnvelope;
   if (!e || e.appId !== APP_ID || e.exportFormat !== EXPORT_FORMAT) throw new Error("別アプリのexportは読み込めません。");
+  if (e.persistenceSchemaVersion !== PERSISTENCE_SCHEMA_VERSION || e.exportFormatVersion !== EXPORT_FORMAT_VERSION) throw new Error("未対応のv3永続化形式です。");
+  if (e.engineVersion !== ENGINE_VERSION) throw new Error("Engine versionが一致しません。");
+  if (!e.schedulerMetadata || e.schedulerMetadata.packageVersion !== SCHEDULER_CONFIG.packageVersion) throw new Error("Scheduler metadataが一致しません。");
   const { checksum, ...body } = e;
   if (await sha(stableJson(body)) !== checksum) throw new Error("Export checksumが一致しません。");
-  return e;
+  return { ...e, memory: e.memory.map((row) => ({ ...row, card: hydrateCard(row.card), schedulerMetadata: row.schedulerMetadata ?? e.schedulerMetadata })) };
 }
 
 function openBackupDb(): Promise<IDBDatabase> {
@@ -215,10 +236,11 @@ export async function loadBackup(snapshotId: string): Promise<ExportEnvelope> {
   return envelope;
 }
 
-export async function replaceGeneration(db: IDBDatabase, writer: SingleWriter, source: ExportEnvelope | null, dataVersion: string, origin: "import" | "restore" | "reset"): Promise<void> {
+export interface DatasetIdentity { dataVersion: string; registryCount: number; coreCount: number; currentStableIds: ReadonlySet<string>; }
+export async function replaceGeneration(db: IDBDatabase, writer: SingleWriter, source: ExportEnvelope | null, dataset: DatasetIdentity, origin: "import" | "restore" | "reset"): Promise<void> {
   const now = new Date().toISOString();
   const generationId = uuid();
-  const generation: GenerationMeta = { key: "generation", generationId, revision: 1, createdAt: now, origin, dataVersion, registryCount: 623, coreCount: 241 };
+  const generation: GenerationMeta = { key: "generation", generationId, revision: 1, createdAt: now, origin, dataVersion: dataset.dataVersion, registryCount: dataset.registryCount, coreCount: dataset.coreCount, productVersion: PRODUCT_VERSION, engineVersion: ENGINE_VERSION, persistenceSchemaVersion: PERSISTENCE_SCHEMA_VERSION, createdByRelease: PRODUCT_VERSION };
   const prefs: Preferences = source ? { ...source.preferences, generationId, lastAppliedRevision: 1 } : { key: "preferences", generationId, dailyTargetSeconds: DAY_TARGET, learningTimeZone: "Europe/London", examDate: null, diagnosticCompleted: false, lastAppliedRevision: 1 };
   const tx = db.transaction(["coordination", "meta", "memory", "plans", "sessions", "events"], "readwrite");
   await liveLease(writer, tx);
@@ -230,16 +252,24 @@ export async function replaceGeneration(db: IDBDatabase, writer: SingleWriter, s
   plans.clear();
   sessions.clear();
   events.clear();
-  tx.objectStore("meta").put({ key: "baseline", generationId, logicalRevision: 0, createdAt: now, dataVersion, registryCount: 623, coreCount: 241 });
+  tx.objectStore("meta").put({ key: "baseline", generationId, logicalRevision: 0, createdAt: now, dataVersion: dataset.dataVersion, registryCount: dataset.registryCount, coreCount: dataset.coreCount });
   tx.objectStore("meta").put(generation);
   tx.objectStore("meta").put(prefs);
   let revision = 1;
   events.put({ key: `domain:${generationId}:1`, generationId, revision: 1, type: "GenerationStarted", at: now, payload: { origin } } satisfies DomainEvent);
   if (source) {
-    for (const row of source.memory) memory.put({ ...row, generationId, lastAppliedRevision: 1 });
-    for (const row of source.plans) plans.put({ ...row, generationId, key: `plan:${generationId}:${row.learningDayId}`, lastAppliedRevision: 1 });
-    events.put({ key: `domain:${generationId}:2`, generationId, revision: 2, type: "HistoryRebased", at: now, payload: { sourceGenerationId: source.generation.generationId, sourceEventCount: source.events.length, technicalReconciliation: true, activeSessionReconciled: true } } satisfies DomainEvent);
-    revision = 2;
+    for (const prior of [...source.events].sort((a, b) => a.revision - b.revision || a.at.localeCompare(b.at))) {
+      revision += 1;
+      events.put({ ...prior, key: `imported:${generationId}:${revision}`, generationId, revision, payload: { ...prior.payload, sourceGenerationId: prior.generationId, sourceRevision: prior.revision } });
+    }
+    revision += 1;
+    const appliedRevision = revision;
+    for (const row of source.memory) memory.put({ ...row, generationId, card: hydrateCard(row.card), lastAppliedRevision: appliedRevision, retired: !dataset.currentStableIds.has(row.stableId) });
+    for (const row of source.plans) plans.put({ ...row, generationId, key: `plan:${generationId}:${row.learningDayId}`, lastAppliedRevision: appliedRevision });
+    if (source.activeSession && source.activeSession.queue.every((q) => dataset.currentStableIds.has(q.stableId))) {
+      sessions.put({ ...source.activeSession, generationId, lastAppliedRevision: appliedRevision, updatedAt: now });
+    }
+    events.put({ key: `domain:${generationId}:${revision}`, generationId, revision, type: "HistoryRebased", at: now, payload: { sourceGenerationId: source.generation.generationId, sourceEventCount: source.events.length, technicalReconciliation: true, activeSessionReconciled: true } } satisfies DomainEvent);
   }
   generation.revision = revision;
   tx.objectStore("meta").put(generation);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APP_ID, BROADCAST_CHANNEL, DB_NAME, EXPORT_FORMAT, LOCAL_STORAGE_PREFIX, SCHEDULER_CONFIG, acceptsExportAppId, exportRejectionReason } from "../src/config";
+import { APP_ID, BROADCAST_CHANNEL, DB_NAME, EXPORT_FORMAT, INDEXED_DB_VERSION, LOCAL_STORAGE_PREFIX, PERSISTENCE_SCHEMA_VERSION, PRODUCT_VERSION, SCHEDULER_CONFIG, acceptsExportAppId, exportRejectionReason } from "../src/config";
 
 describe("application isolation", () => {
   it("uses the Rikkyo appId", () => expect(APP_ID).toBe("rikkyo-uk-vocab"));
@@ -7,6 +7,7 @@ describe("application isolation", () => {
   it("uses a Rikkyo localStorage prefix", () => expect(LOCAL_STORAGE_PREFIX).toContain(APP_ID));
   it("uses a Rikkyo broadcast channel", () => expect(BROADCAST_CHANNEL).toContain(APP_ID));
   it("uses a Rikkyo export format", () => expect(EXPORT_FORMAT).toContain(APP_ID));
+  it("freezes v3 as the compatibility origin", () => { expect(PRODUCT_VERSION).toBe("3.0.0"); expect(PERSISTENCE_SCHEMA_VERSION).toBe(3); expect(INDEXED_DB_VERSION).toBe(3); });
   it("accepts the Rikkyo appId", () => expect(acceptsExportAppId(APP_ID)).toBe(true));
   it("rejects the Waseda appId", () => expect(acceptsExportAppId("waseda-vocab")).toBe(false));
   it("gives an explicit Waseda rejection", () => expect(exportRejectionReason("waseda-vocab")).toContain("早稲田"));

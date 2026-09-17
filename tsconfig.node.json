@@ -19,6 +19,9 @@
     "src/fsrsAdapter.ts",
     "src/rich/types.ts",
     "src/rich/planner.ts",
-    "src/rich/diagnostic.ts"
+    "src/rich/diagnostic.ts",
+    "src/rich/store.ts",
+    "src/storage.ts",
+    "src/common-engine/session-orchestration.ts"
   ]
 }
