@@ -74,7 +74,7 @@ export async function ensureGeneration(db: IDBDatabase, dataVersion: string, reg
     tx.objectStore("events").put({ key: `domain:${generation.generationId}:2`, generationId: generation.generationId, revision: 2, type: "LegacyMemoryMigrated", at: createdAt, payload: { migrated: legacy.length, sourceSchema: "word-memory-v1", targetSkill: "meaningRecognition" } } satisfies DomainEvent);
   }
   generation.revision = revision;
-  const prefs: Preferences = { key: "preferences", generationId: generation.generationId, dailyTargetSeconds: DAY_TARGET, learningTimeZone: "Europe/London", examDate: null, diagnosticCompleted: false, lastAppliedRevision: revision };
+  const prefs: Preferences = { key: "preferences", generationId: generation.generationId, dailyTargetSeconds: DAY_TARGET, learningTimeZone: "Europe/London", examDate: null, diagnosticCompleted: false, studyMode: "recommended", sessionSize: 20, scheduleFilter: "all", accent: "auto", voiceURI: "", theme: "auto", lastAppliedRevision: revision };
   tx.objectStore("meta").put(generation);
   tx.objectStore("meta").put(prefs);
   await done(tx);
@@ -125,7 +125,7 @@ export async function commitEventOnly(db: IDBDatabase, writer: SingleWriter, typ
   await commitDomain(db, writer, type, payload, () => undefined);
 }
 
-export async function savePreferences(db: IDBDatabase, writer: SingleWriter, patch: Partial<Pick<Preferences, "dailyTargetSeconds" | "learningTimeZone" | "examDate" | "diagnosticCompleted">>): Promise<void> {
+export async function savePreferences(db: IDBDatabase, writer: SingleWriter, patch: Partial<Pick<Preferences, "dailyTargetSeconds" | "learningTimeZone" | "examDate" | "diagnosticCompleted" | "studyMode" | "sessionSize" | "scheduleFilter" | "accent" | "voiceURI" | "theme">>): Promise<void> {
   const state = await loadRichState(db); if (!state.preferences || !state.generation) throw new Error("NO_GENERATION");
   const next: Preferences = { ...state.preferences, ...patch, lastAppliedRevision: state.generation.revision + 1 };
   await commitDomain(db, writer, "PreferencesUpdated", patch as Record<string, unknown>, ({ meta }) => meta.put(next));

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeBundle, RuntimeEntity } from "../src/runtime";
 import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, stateKey } from "../src/rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, makeQuestion, stateKey } from "../src/rich/planner";
 import type { SkillState } from "../src/rich/types";
 
 function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : "Core"): RuntimeEntity {
@@ -14,15 +14,24 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
     prompts: { recognition: [{}], spelling: [{}] },
     priority: i < 4 ? "S" : i < 12 ? "A" : "B",
     targetBand: band,
+    schedules: [i % 2 ? "A" : "B"],
     quizEligible: true,
     diagnosticEligible: true,
+    observedFrequency: i % 6,
+    years: [2024 + (i % 3)],
+    sourceSchedules: [i % 2 ? "A" : "B"],
+    categories: ["reading"],
+    evidence: [],
+    sourceExample: null,
+    generatedExample: null,
+    cloze: { sentence: `This is _____.`, answer: `word${i}`, provenance: "past-paper-derived" },
   };
 }
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.0.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test" },
-    manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 623, coreEntityCount: 241, generatedFromPhase: 17 },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.1.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 623, coreEntityCount: 241, generatedFromPhase: 17, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 623 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
   };
@@ -89,5 +98,20 @@ describe("adaptive Phase 22 planner", () => {
 
   it("uses stableId × skillKey as separate memory keys", () => {
     expect(stateKey("rik-v-x", "meaningRecognition")).not.toBe(stateKey("rik-v-x", "formProduction"));
+  });
+
+  it("supports Waseda-style mode and A/B filtering without changing IDs", () => {
+    const b = bundle();
+    const plan = ensurePlan("g1", 1200, undefined, "Europe/London", new Date("2026-09-17T12:00:00Z"));
+    const q = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 20, { mode: "foundation", schedule: "A" });
+    expect(q.length).toBeGreaterThan(0);
+    expect(q.every((x) => x.entity.targetBand === "Foundation" && x.entity.schedules?.includes("A"))).toBe(true);
+  });
+
+  it("creates source-aware question variants", () => {
+    const b = bundle();
+    const item = { entity: b.core[0]!, skillKey: "meaningRecognition" as const, lane: "review" as const, state: { ...createInitialState("g1", b.core[0]!.stableId, "meaningRecognition"), correct: 2 } };
+    const q = makeQuestion(b, item);
+    expect(["meaningChoice", "audioChoice", "clozeChoice"]).toContain(q.kind);
   });
 });

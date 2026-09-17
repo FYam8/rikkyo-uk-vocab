@@ -5,6 +5,9 @@ export type SkillKey = "meaningRecognition" | "formProduction";
 export type Stage = "learning" | "review" | "relearning" | "provisional" | "acquisitionCandidate";
 export type Lane = "learning" | "relearning" | "provisional" | "review" | "acquisition";
 export type RatingName = "Again" | "Hard" | "Good";
+export type StudyMode = "recommended" | "foundation" | "core" | "unlearned" | "weak" | "review" | "frequent" | "random";
+export type ScheduleFilter = "all" | "A" | "B";
+export type QuestionKind = "meaningChoice" | "reverseChoice" | "input" | "audioChoice" | "audioInput" | "clozeChoice";
 
 export interface SkillState {
   key: string;
@@ -42,6 +45,12 @@ export interface Preferences {
   learningTimeZone: string;
   examDate: string | null;
   diagnosticCompleted: boolean;
+  studyMode?: StudyMode;
+  sessionSize?: number;
+  scheduleFilter?: ScheduleFilter;
+  accent?: "auto" | "gb" | "us";
+  voiceURI?: string;
+  theme?: "auto" | "light" | "dark";
   lastAppliedRevision: number;
 }
 
@@ -109,6 +118,9 @@ export interface QuestionRun {
   prompt: string;
   choices: string[];
   answer: string;
+  kind?: QuestionKind;
+  context?: string;
+  sourceLabel?: string;
 }
 
 export interface StoredSessionRecord {

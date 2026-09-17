@@ -15,6 +15,7 @@ body {
   background: radial-gradient(circle at 85% 4%, #d9e4d5 0, transparent 30rem), #f4efe4;
 }
 button, select { font: inherit; }
+:root[data-theme="dark"]{color-scheme:dark;background:#10201c}:root[data-theme="dark"] body{color:#edf3f0;background:radial-gradient(circle at 85% 4%,#233d35 0,transparent 30rem),#10201c}:root[data-theme="dark"] .masthead,:root[data-theme="dark"] .learner-nav{background:rgba(20,36,31,.94)}:root[data-theme="dark"] .study-card,:root[data-theme="dark"] .word-list details,:root[data-theme="dark"] .settings-card,:root[data-theme="dark"] .recovery-card,:root[data-theme="dark"] .analysis-grid section,:root[data-theme="dark"] .top-table,:root[data-theme="dark"] .status-card.light{background:#182b25;color:#edf3f0}:root[data-theme="dark"] input,:root[data-theme="dark"] select,:root[data-theme="dark"] .rich-choice{background:#20362f;color:#edf3f0}:root[data-theme="dark"] .page h1,:root[data-theme="dark"] .study-card h2,:root[data-theme="dark"] .word-list b{color:#f3e3c4}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}:root[data-theme="auto"] body{color:#edf3f0;background:#10201c}}
 button { -webkit-tap-highlight-color: transparent; }
 
 .app-shell { width: min(1120px, calc(100% - 48px)); margin: 0 auto; padding-bottom: 48px; }

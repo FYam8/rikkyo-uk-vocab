@@ -1,4 +1,4 @@
-const RELEASE = "3.0.0--common-vocab-engine-1.0.0--0.22.1-core--p3";
+const RELEASE = "3.1.0--common-vocab-engine-1.0.0--0.22.1-core--e2026-09-17--p3";
 const CACHE_NAME = `rikkyo-uk-vocab-${RELEASE}`;
 const SCOPE = "/rikkyo-uk-vocab/";
 
@@ -9,12 +9,12 @@ async function buildAtomicCache() {
   if (!releaseResponse.ok || !dataResponse.ok || !indexResponse.ok) throw new Error("RELEASE_TUPLE_FETCH_FAILED");
   const release = await releaseResponse.clone().json();
   const data = await dataResponse.clone().json();
-  if (release.productVersion !== "3.0.0" || release.engineVersion !== "common-vocab-engine/1.0.0" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3) {
+  if (release.productVersion !== "3.1.0" || release.engineVersion !== "common-vocab-engine/1.0.0" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
     throw new Error("RELEASE_TUPLE_MISMATCH");
   }
   const html = await indexResponse.clone().text();
   const assetPaths = [...html.matchAll(/(?:src|href)="(\.\/assets\/[^"]+)"/g)].map((m) => new URL(m[1], self.location.origin + SCOPE).pathname);
-  const urls = [SCOPE, `${SCOPE}release-manifest.json`, `${SCOPE}data/manifest.json`, `${SCOPE}data/registry.json`,
+  const urls = [SCOPE, `${SCOPE}release-manifest.json`, `${SCOPE}data/manifest.json`, `${SCOPE}data/registry.json`, `${SCOPE}data/${data.enrichment}`,
     ...data.chunks.map((name) => `${SCOPE}data/${name}`), `${SCOPE}manifest.webmanifest`, ...assetPaths];
   const cache = await caches.open(CACHE_NAME);
   await cache.addAll([...new Set(urls)]);
