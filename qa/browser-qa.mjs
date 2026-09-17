@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.3.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.3.1" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
   if (await page.locator("#schedule-filter").count()) throw new Error("A/B schedule output filter must not be shown");
@@ -43,6 +43,29 @@ try {
   if (!wrongChoice) throw new Error("wrong choice fixture missing");
   await page.getByRole("button", { name: wrongChoice, exact: true }).dblclick();
   await page.getByRole("button", { name: "次へ" }).waitFor();
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  const contrast = await page.evaluate(() => {
+    const channel = (value) => { const v = value / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const rgb = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const luminance = (value) => { const [r, g, b] = rgb(value).map(channel); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const effectiveBackground = (element) => {
+      let current = element;
+      while (current) {
+        const value = getComputedStyle(current).backgroundColor;
+        const parts = value.match(/[\d.]+/g) ?? [];
+        if (parts.length === 3 || Number(parts[3]) > 0) return value;
+        current = current.parentElement;
+      }
+      return "rgb(0, 0, 0)";
+    };
+    const ratio = (element) => { const style = getComputedStyle(element); const a = luminance(style.color), b = luminance(effectiveBackground(element)); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    const selectors = [".feedback span", ".rich-choice.correct-choice", ".rich-choice.wrong-choice", ".exam-example small"];
+    return Object.fromEntries(selectors.map((selector) => { const element = document.querySelector(selector); return [selector, element ? ratio(element) : null]; }));
+  });
+  for (const [selector, ratio] of Object.entries(contrast)) {
+    if (ratio === null) throw new Error(`dark-mode contrast target missing: ${selector}`);
+    if (ratio < 4.5) throw new Error(`dark-mode contrast below 4.5 for ${selector}: ${ratio}`);
+  }
   const eventCount = await page.evaluate(async () => new Promise((resolve, reject) => {
     const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
     request.onerror = () => reject(request.error);
@@ -138,7 +161,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.3 unified A/B, exam difficulty, audio fallback, Waseda-parity retry, six-paper evidence, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.3.1 dark-mode contrast, unified A/B, exam difficulty, audio fallback, Waseda-parity retry, six-paper evidence, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }
