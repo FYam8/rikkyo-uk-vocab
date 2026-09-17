@@ -166,6 +166,13 @@ function lemmaDistractors(bundle: RuntimeBundle, entity: RuntimeEntity): string[
     .map((x) => x.lemma).filter((x, i, a) => x && a.indexOf(x) === i)
     .slice(0, 3);
 }
+function sourceLabel(entity: RuntimeEntity): string | undefined {
+  return entity.sourceExample
+    ? `FY${String(entity.sourceExample.year).slice(-2)} ${entity.sourceExample.schedule} · PDF p.${entity.sourceExample.page}`
+    : entity.generatedExample
+      ? "立教傾向から生成"
+      : undefined;
+}
 function questionKind(item: PlannedItem, options: QuestionOptions): QuestionKind {
   const allowAudio = options.allowAudio !== false;
   const strength = Math.max(0, (item.state?.correct ?? 0) - (item.state?.wrong ?? 0));
@@ -189,19 +196,53 @@ export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem, options: 
   const meaning = item.entity.senses[0]?.glossJa ?? "";
   const id = crypto.randomUUID();
   const kind = questionKind(item, options);
-  const sourceLabel = item.entity.sourceExample ? `FY${String(item.entity.sourceExample.year).slice(-2)} ${item.entity.sourceExample.schedule} · PDF p.${item.entity.sourceExample.page}` : item.entity.generatedExample ? "立教傾向から生成" : undefined;
-  if (kind === "input" || kind === "audioInput") return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: meaning, choices: [], answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
-  if (kind === "clozeInput" && item.entity.cloze) return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: "空所に入る語句を入力してください", context: item.entity.cloze.sentence, choices: [], answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
+  const currentSourceLabel = sourceLabel(item.entity);
+  if (kind === "input" || kind === "audioInput") return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: meaning, choices: [], answer: item.entity.lemma, ...(currentSourceLabel ? { sourceLabel: currentSourceLabel } : {}) };
+  if (kind === "clozeInput" && item.entity.cloze) return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: "空所に入る語句を入力してください", context: item.entity.cloze.sentence, choices: [], answer: item.entity.lemma, ...(currentSourceLabel ? { sourceLabel: currentSourceLabel } : {}) };
   if (kind === "reverseChoice") {
     const choices = [item.entity.lemma, ...lemmaDistractors(bundle, item.entity)].sort((a, b) => stableNumber(`${id}:${a}`) - stableNumber(`${id}:${b}`));
-    return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: meaning, choices, answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
+    return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: meaning, choices, answer: item.entity.lemma, ...(currentSourceLabel ? { sourceLabel: currentSourceLabel } : {}) };
   }
   if (kind === "clozeChoice" && item.entity.cloze) {
     const choices = [item.entity.lemma, ...lemmaDistractors(bundle, item.entity)].sort((a, b) => stableNumber(`${id}:${a}`) - stableNumber(`${id}:${b}`));
-    return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: "空所に入る語句を選んでください", context: item.entity.cloze.sentence, choices, answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
+    return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: "空所に入る語句を選んでください", context: item.entity.cloze.sentence, choices, answer: item.entity.lemma, ...(currentSourceLabel ? { sourceLabel: currentSourceLabel } : {}) };
   }
   const choices = [meaning, ...distractors(bundle, item.entity)].sort((a, b) => stableNumber(`${id}:${a}`) - stableNumber(`${id}:${b}`));
-  return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: item.entity.lemma, choices, answer: meaning, ...(sourceLabel ? { sourceLabel } : {}) };
+  return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: item.entity.lemma, choices, answer: meaning, ...(currentSourceLabel ? { sourceLabel: currentSourceLabel } : {}) };
+}
+
+/** Rehydrates a persisted, unanswered question from the current corpus without changing its identity. */
+export function refreshStoredQuestion(bundle: RuntimeBundle, question: QuestionRun): QuestionRun {
+  const entity = bundle.core.find((item) => item.stableId === question.stableId);
+  if (!entity) return question;
+  const { context: _oldContext, sourceLabel: _oldSourceLabel, ...base } = question;
+  const currentSourceLabel = sourceLabel(entity);
+  const withSource = <T extends QuestionRun>(next: T): T => ({
+    ...next,
+    ...(currentSourceLabel ? { sourceLabel: currentSourceLabel } : {}),
+  });
+  const meaning = entity.senses[0]?.glossJa ?? "";
+  const lemmaChoices = () => [entity.lemma, ...lemmaDistractors(bundle, entity)]
+    .sort((a, b) => stableNumber(`${question.questionInstanceId}:${a}`) - stableNumber(`${question.questionInstanceId}:${b}`));
+  const meaningChoices = () => [meaning, ...distractors(bundle, entity)]
+    .sort((a, b) => stableNumber(`${question.questionInstanceId}:${a}`) - stableNumber(`${question.questionInstanceId}:${b}`));
+
+  if ((question.kind === "clozeInput" || question.kind === "clozeChoice") && entity.cloze) {
+    return withSource({
+      ...base,
+      prompt: question.kind === "clozeInput" ? "空所に入る語句を入力してください" : "空所に入る語句を選んでください",
+      context: entity.cloze.sentence,
+      choices: question.kind === "clozeInput" ? [] : lemmaChoices(),
+      answer: entity.lemma,
+    });
+  }
+  if (question.kind === "input" || question.kind === "audioInput" || question.kind === "clozeInput") {
+    return withSource({ ...base, kind: question.kind === "clozeInput" ? "input" : question.kind, prompt: meaning, choices: [], answer: entity.lemma });
+  }
+  if (question.kind === "reverseChoice") {
+    return withSource({ ...base, prompt: meaning, choices: lemmaChoices(), answer: entity.lemma });
+  }
+  return withSource({ ...base, kind: question.kind === "clozeChoice" ? "meaningChoice" : question.kind, prompt: entity.lemma, choices: meaningChoices(), answer: meaning });
 }
 
 export function retryGap(entity: RuntimeEntity): 6 | 8 { return entity.priority === "S" || entity.targetBand === "Foundation" ? 6 : 8; }

@@ -3,7 +3,7 @@ import "./rich/styles.css";
 import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./runtime";
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, retryGap, stateKey } from "./rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, discardInvalidActiveSession, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, repairStartupTransientState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
 import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
@@ -469,17 +469,18 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     await clearActiveSession(ctx.db, ctx.writer, "completed-recovered");
     return;
   }
+  const refreshedQueue = stored.queue.map((question, index) => index < resumeIndex ? question : refreshStoredQuestion(ctx!.bundle, question));
   const diagnosticEvents = initialEvents.filter((e) => e.type === "DiagnosticAnswer" && e.payload.sessionId === stored.sessionId);
   session = {
     generationId: stored.generationId,
     sessionId: stored.sessionId,
     startedAt: stored.startedAt,
     mode: stored.mode,
-    queue: audioQuestionsEnabled(preferences) ? stored.queue : stored.queue.map(removeAudioRequirement),
+    queue: audioQuestionsEnabled(preferences) ? refreshedQueue : refreshedQueue.map(removeAudioRequirement),
     index: resumeIndex,
     shownAt: Date.now(),
     diagnostics: diagnosticEvents.map((e) => ({ correct: e.payload.correct === true })),
-    baseTotal: stored.baseTotal ?? stored.queue.filter((q) => !q.isRetry).length,
+    baseTotal: stored.baseTotal ?? refreshedQueue.filter((q) => !q.isRetry).length,
     correct: stored.correct ?? 0,
     wrong: stored.wrong ?? 0,
     retryAnswered: stored.retryAnswered ?? 0,

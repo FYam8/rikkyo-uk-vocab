@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeBundle, RuntimeEntity } from "../src/runtime";
 import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, retryGap, stateKey } from "../src/rich/planner";
-import type { SkillState } from "../src/rich/types";
+import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
+import type { QuestionRun, SkillState } from "../src/rich/types";
 
 function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : "Core"): RuntimeEntity {
   return {
@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.5", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.6", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -132,5 +132,34 @@ describe("adaptive Phase 22 planner", () => {
     expect(retry.isRetry).toBe(true);
     expect(retry.retryOf).toBe(original.questionInstanceId);
     expect(retryGap(e)).toBe(8);
+  });
+
+  it("rehydrates an old generic cloze from the current corpus without losing session identity", () => {
+    const b = bundle();
+    const e = b.core[0]!;
+    const old: QuestionRun = {
+      questionInstanceId: "persisted-question",
+      stableId: e.stableId,
+      skillKey: "formProduction",
+      lane: "acquisition",
+      kind: "clozeChoice",
+      prompt: "old prompt",
+      context: "The passage uses “_____” in an important context.",
+      choices: ["stale", e.lemma],
+      answer: "stale",
+      sourceLabel: "stale source",
+      isRetry: true,
+      retryOf: "original-question",
+    };
+    const refreshed = refreshStoredQuestion(b, old);
+    expect(refreshed.questionInstanceId).toBe(old.questionInstanceId);
+    expect(refreshed.context).toBe("This is _____.");
+    expect(refreshed.prompt).toBe("空所に入る語句を選んでください");
+    expect(refreshed.answer).toBe(e.lemma);
+    expect(refreshed.choices).toContain(e.lemma);
+    expect(refreshed.choices).not.toContain("stale");
+    expect(refreshed.isRetry).toBe(true);
+    expect(refreshed.retryOf).toBe("original-question");
+    expect(refreshed.sourceLabel).toBeUndefined();
   });
 });

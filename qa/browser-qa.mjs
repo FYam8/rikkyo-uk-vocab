@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.5" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.5.6" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -84,7 +84,7 @@ try {
       const generation = tx.objectStore("meta").get("generation");
       generation.onsuccess = () => {
         const now = new Date().toISOString();
-        tx.objectStore("sessions").put({ key: "active-session", generationId: generation.result.generationId, sessionId: "qa-method-cloze", mode: "study", queue: [{ questionInstanceId: "qa-method-question", stableId: methodItem.stableId, skillKey: "formProduction", lane: "acquisition", kind: "clozeInput", prompt: "方法", context: methodItem.cloze.sentence, choices: [], answer: "method", sourceLabel: "FY26 A · PDF p.8" }], resumeIndex: 0, startedAt: now, updatedAt: now, baseTotal: 1, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: [], lastAppliedRevision: generation.result.revision });
+        tx.objectStore("sessions").put({ key: "active-session", generationId: generation.result.generationId, sessionId: "qa-method-cloze", mode: "study", queue: [{ questionInstanceId: "qa-method-question", stableId: methodItem.stableId, skillKey: "formProduction", lane: "acquisition", kind: "clozeInput", prompt: "old prompt", context: "The passage uses “_____” in an important context.", choices: [], answer: "stale", sourceLabel: "stale source" }], resumeIndex: 0, startedAt: now, updatedAt: now, baseTotal: 1, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: [], lastAppliedRevision: generation.result.revision });
       };
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -95,6 +95,16 @@ try {
   await clozePage.goto(baseURL, { waitUntil: "networkidle" });
   await clozePage.getByText("The electricity experiment will take place next week, so please review your class notes and _____.", { exact: true }).waitFor();
   await clozePage.getByText("意味：方法", { exact: true }).waitFor();
+  const refreshedCloze = await clozePage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const get = request.result.transaction("sessions", "readonly").objectStore("sessions").get("active-session");
+      get.onsuccess = () => resolve(get.result?.queue?.[0] ?? null);
+      get.onerror = () => reject(get.error);
+    };
+  }));
+  if (refreshedCloze?.context !== method.cloze.sentence || refreshedCloze?.answer !== "method" || refreshedCloze?.prompt !== "空所に入る語句を入力してください") throw new Error("persisted cloze was not refreshed from the current corpus");
   await clozePage.locator(".question-flags").getByText("新出", { exact: true }).waitFor();
   if (await clozePage.locator(".question-flags").getByText("acquisition", { exact: true }).count()) throw new Error("internal acquisition label is visible");
   await clozeContext.close();
@@ -274,7 +284,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.5 audited cloze corpus, Japanese lane labels, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.5.6 persisted-question refresh, audited cloze corpus, Japanese lane labels, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }
