@@ -1,6 +1,6 @@
-import { APP_ID, BROADCAST_CHANNEL, DB_NAME } from "./config";
+import { APP_ID, BROADCAST_CHANNEL, DB_NAME, INDEXED_DB_VERSION, PERSISTENCE_SCHEMA_VERSION, PRODUCT_VERSION } from "./config";
 
-const DB_VERSION = 1;
+const DB_VERSION = INDEXED_DB_VERSION;
 const LEASE_MS = 8_000;
 
 export interface WriterLease {
@@ -42,7 +42,10 @@ export function openStudyDb(dbName: string = DB_NAME): Promise<IDBDatabase> {
       for (const store of ["meta", "memory", "events", "sessions", "plans", "coordination"]) {
         if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath: "key" });
       }
-      request.transaction!.objectStore("meta").put({ key: "identity", appId: APP_ID, schemaVersion: DB_VERSION });
+      request.transaction!.objectStore("meta").put({
+        key: "identity", appId: APP_ID, persistenceSchemaVersion: PERSISTENCE_SCHEMA_VERSION,
+        indexedDbVersion: DB_VERSION, createdByRelease: PRODUCT_VERSION,
+      });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -88,12 +91,13 @@ export async function readStudyEvents(db: IDBDatabase): Promise<StudyEventRecord
 }
 
 export class SingleWriter {
-  readonly ownerId = crypto.randomUUID();
+  readonly ownerId: string;
   private generation = 0;
   private timer: number | undefined;
   private channel: BroadcastChannel | null = null;
 
-  constructor(private readonly db: IDBDatabase, channelName: string = BROADCAST_CHANNEL) {
+  constructor(private readonly db: IDBDatabase, channelName: string = BROADCAST_CHANNEL, ownerId: string = crypto.randomUUID()) {
+    this.ownerId = ownerId;
     if (typeof BroadcastChannel !== "undefined") this.channel = new BroadcastChannel(channelName);
   }
 

@@ -1,4 +1,5 @@
 import type { Card } from "ts-fsrs";
+import type { RELEASE_TUPLE, SCHEDULER_CONFIG } from "../config";
 
 export type SkillKey = "meaningRecognition" | "formProduction";
 export type Stage = "learning" | "review" | "relearning" | "provisional" | "acquisitionCandidate";
@@ -21,6 +22,17 @@ export interface SkillState {
   provisionalUntil: string | null;
   lastSeenAt: string | null;
   lastAppliedRevision: number;
+  schedulerMetadata?: SchedulerMetadata;
+  retired?: boolean;
+}
+
+export interface SchedulerMetadata {
+  algorithm: typeof SCHEDULER_CONFIG.algorithm;
+  package: typeof SCHEDULER_CONFIG.package;
+  packageVersion: typeof SCHEDULER_CONFIG.packageVersion;
+  desiredRetention: number;
+  enableFuzz: boolean;
+  enableShortTerm: boolean;
 }
 
 export interface Preferences {
@@ -59,6 +71,10 @@ export interface GenerationMeta {
   dataVersion: string;
   registryCount: number;
   coreCount: number;
+  productVersion: string;
+  engineVersion: string;
+  persistenceSchemaVersion: number;
+  createdByRelease: string;
 }
 
 export interface DomainEvent {
@@ -68,6 +84,21 @@ export interface DomainEvent {
   type: string;
   at: string;
   payload: Record<string, unknown>;
+}
+
+export interface CanonicalReviewPayload extends Record<string, unknown> {
+  eventId: string;
+  idempotencyKey: string;
+  sessionId: string;
+  questionInstanceId: string;
+  stableId: string;
+  skillKey: SkillKey;
+  timestamp: string;
+  result: "correct" | "wrong";
+  rating: RatingName;
+  lane: Lane;
+  schedulerMetadata: SchedulerMetadata;
+  schedulerCardAfter: Card | null;
 }
 
 export interface QuestionRun {
@@ -94,7 +125,14 @@ export interface StoredSessionRecord {
 
 export interface ExportEnvelope {
   appId: "rikkyo-uk-vocab";
-  exportFormat: "rikkyo-uk-vocab-export/v1";
+  exportFormat: "rikkyo-uk-vocab-export/v3";
+  productVersion: typeof RELEASE_TUPLE.productVersion;
+  engineVersion: typeof RELEASE_TUPLE.engineVersion;
+  datasetVersion: string;
+  persistenceSchemaVersion: typeof RELEASE_TUPLE.persistenceSchemaVersion;
+  exportFormatVersion: typeof RELEASE_TUPLE.exportFormatVersion;
+  createdByRelease: string;
+  schedulerMetadata: SchedulerMetadata;
   exportedAt: string;
   dataVersion: string;
   generation: GenerationMeta;
@@ -102,6 +140,7 @@ export interface ExportEnvelope {
   memory: SkillState[];
   plans: DailyPlanRecord[];
   events: DomainEvent[];
+  activeSession: StoredSessionRecord | null;
   checksum: string;
 }
 

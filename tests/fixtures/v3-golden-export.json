@@ -1,0 +1,25 @@
+{
+  "appId": "rikkyo-uk-vocab",
+  "exportFormat": "rikkyo-uk-vocab-export/v3",
+  "productVersion": "3.0.0",
+  "engineVersion": "common-vocab-engine/1.0.0",
+  "datasetVersion": "0.22.1-core",
+  "persistenceSchemaVersion": 3,
+  "exportFormatVersion": 3,
+  "createdByRelease": "3.0.0",
+  "schedulerMetadata": {"algorithm":"FSRS-6","package":"ts-fsrs","packageVersion":"5.4.2","desiredRetention":0.9,"enableFuzz":false,"enableShortTerm":false},
+  "exportedAt": "2026-09-17T00:00:00.000Z",
+  "dataVersion": "0.22.1-core",
+  "generation": {"key":"generation","generationId":"golden-v3","revision":4,"createdAt":"2026-09-17T00:00:00.000Z","origin":"fresh","dataVersion":"0.22.1-core","registryCount":623,"coreCount":241,"productVersion":"3.0.0","engineVersion":"common-vocab-engine/1.0.0","persistenceSchemaVersion":3,"createdByRelease":"3.0.0"},
+  "preferences": {"key":"preferences","generationId":"golden-v3","dailyTargetSeconds":1200,"learningTimeZone":"Europe/London","examDate":null,"diagnosticCompleted":false,"lastAppliedRevision":1},
+  "memory": [
+    {"key":"skill:rik-v-golden:meaningRecognition","stableId":"rik-v-golden","skillKey":"meaningRecognition","generationId":"golden-v3","stage":"review","card":{"due":"2026-09-20T00:00:00.000Z","stability":2,"difficulty":5,"elapsed_days":1,"scheduled_days":2,"reps":2,"lapses":0,"state":2,"last_review":"2026-09-18T00:00:00.000Z"},"stepIndex":0,"dueAt":"2026-09-20T00:00:00.000Z","correct":2,"wrong":0,"lapses":0,"episodeId":null,"provisionalUntil":null,"lastSeenAt":"2026-09-18T00:00:00.000Z","lastAppliedRevision":3,"schedulerMetadata":{"algorithm":"FSRS-6","package":"ts-fsrs","packageVersion":"5.4.2","desiredRetention":0.9,"enableFuzz":false,"enableShortTerm":false}},
+    {"key":"skill:rik-retired-golden:formProduction","stableId":"rik-retired-golden","skillKey":"formProduction","generationId":"golden-v3","stage":"learning","card":null,"stepIndex":1,"dueAt":"2026-09-17T00:10:00.000Z","correct":1,"wrong":1,"lapses":0,"episodeId":"episode-retired","provisionalUntil":null,"lastSeenAt":"2026-09-17T00:00:00.000Z","lastAppliedRevision":4,"retired":true}
+  ],
+  "plans": [],
+  "events": [
+    {"key":"domain:golden-v3:3","generationId":"golden-v3","revision":3,"type":"AnswerCommitted","at":"2026-09-18T00:00:00.000Z","payload":{"eventId":"review:golden-v3:q-golden","idempotencyKey":"q-golden","sessionId":"session-golden","questionInstanceId":"q-golden","stableId":"rik-v-golden","skillKey":"meaningRecognition","timestamp":"2026-09-18T00:00:00.000Z","result":"correct","rating":"Good","lane":"review","schedulerMetadata":{"algorithm":"FSRS-6","package":"ts-fsrs","packageVersion":"5.4.2","desiredRetention":0.9,"enableFuzz":false,"enableShortTerm":false},"schedulerCardAfter":null}}
+  ],
+  "activeSession": {"key":"active-session","generationId":"golden-v3","sessionId":"session-golden","mode":"study","queue":[{"questionInstanceId":"q-next","stableId":"rik-v-golden","skillKey":"meaningRecognition","lane":"review","prompt":"golden","choices":["黄金"],"answer":"黄金"}],"resumeIndex":0,"startedAt":"2026-09-18T00:00:00.000Z","updatedAt":"2026-09-18T00:01:00.000Z","lastAppliedRevision":4},
+  "checksum": "390d48f84926459c4f73bc599037c77c231c93a4cb45ffff418ac2f454cbca6e"
+}

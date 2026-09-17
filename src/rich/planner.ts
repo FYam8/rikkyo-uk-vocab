@@ -1,6 +1,8 @@
-import { Rating, newCard, schedule } from "../fsrsAdapter";
+import { hydrateCard, Rating, newCard, schedule } from "../fsrsAdapter";
+import { SCHEDULER_CONFIG } from "../config";
 import type { RuntimeBundle, RuntimeEntity } from "../runtime";
 import type { DailyPlanRecord, Lane, QuestionRun, SkillKey, SkillState } from "./types";
+import { VOCABULARY_SESSION_ENGINE } from "../common-engine/session-orchestration";
 
 const MINUTE = 60_000;
 const LEARNING_STEPS = [1 * MINUTE, 10 * MINUTE];
@@ -84,14 +86,15 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
       if (isNewEntity) introduced.add(entity.stableId);
     }
   }
-  return items.slice(0, limit);
+  return VOCABULARY_SESSION_ENGINE.take(items, limit);
 }
 
 export function createInitialState(generationId: string, stableId: string, skillKey: SkillKey, now = new Date()): SkillState {
-  return { key: stateKey(stableId, skillKey), stableId, skillKey, generationId, stage: "learning", card: null, stepIndex: 0, dueAt: now.toISOString(), correct: 0, wrong: 0, lapses: 0, episodeId: crypto.randomUUID(), provisionalUntil: null, lastSeenAt: null, lastAppliedRevision: 0 };
+  return { key: stateKey(stableId, skillKey), stableId, skillKey, generationId, stage: "learning", card: null, stepIndex: 0, dueAt: now.toISOString(), correct: 0, wrong: 0, lapses: 0, episodeId: crypto.randomUUID(), provisionalUntil: null, lastSeenAt: null, lastAppliedRevision: 0, schedulerMetadata: SCHEDULER_CONFIG };
 }
 
 export function applyStudyAnswer(previous: SkillState, rating: "Again" | "Hard" | "Good", now = new Date()): SkillState {
+  previous = { ...previous, card: hydrateCard(previous.card), schedulerMetadata: previous.schedulerMetadata ?? SCHEDULER_CONFIG };
   const correct = rating !== "Again";
   const next: SkillState = { ...previous, correct: previous.correct + (correct ? 1 : 0), wrong: previous.wrong + (correct ? 0 : 1), lastSeenAt: now.toISOString() };
   if (previous.stage === "provisional") {
