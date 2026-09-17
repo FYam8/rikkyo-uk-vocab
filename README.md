@@ -4,11 +4,12 @@
 
 ## 公開版
 
-Core 241の正式Phase 17データを接続し、Phase 18〜22で設計した適応学習機能を復元した学習版をGitHub Pagesへ自動公開します。
+FY24〜FY26の英語6冊を再監査し、本文注釈語・定型指示・初歩語の過大評価を除いて再選定したCore 241をGitHub Pagesへ自動公開します。
 
 - Core release: **241 entities**
-- Stable-ID Registry: **623 IDs**
-- Data version: **0.22.1-core**
+- Stable-ID Registry: **801 IDs**（旧623 IDをすべて保持）
+- Data version: **0.23.0-reselected**
+- Difficulty bands: **Foundation 40 / Core 162 / Challenge 39**
 - Scheduler: **FSRS-6 / ts-fsrs 5.4.2 / desired retention 0.90 / fuzz off / short-term FSRS off**
 - Memory key: **stableId × skillKey**
 - Learning lanes: **learning / relearning / provisional / review / acquisition**
@@ -28,7 +29,7 @@ Core 241の正式Phase 17データを接続し、Phase 18〜22で設計した適
 Pages workflowは公開前に次を検証します。
 
 - 241 / 241 Core entity
-- 623 / 623 stable-ID Registry
+- 801 / 801 stable-ID Registry（旧IDの削除・再利用なし）
 - TypeScript production build
 - automated tests
 - adaptive queue / short-term learning / diagnostic policy

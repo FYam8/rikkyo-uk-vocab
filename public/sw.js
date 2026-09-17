@@ -1,4 +1,4 @@
-const RELEASE = "3.3.1--common-vocab-engine-1.0.0--0.22.1-core--e2026-09-17--p3";
+const RELEASE = "3.4.0--common-vocab-engine-1.0.0--0.23.0-reselected--e2026-09-17-r1--p3";
 const CACHE_NAME = `rikkyo-uk-vocab-${RELEASE}`;
 const SCOPE = "/rikkyo-uk-vocab/";
 
@@ -9,7 +9,7 @@ async function buildAtomicCache() {
   if (!releaseResponse.ok || !dataResponse.ok || !indexResponse.ok) throw new Error("RELEASE_TUPLE_FETCH_FAILED");
   const release = await releaseResponse.clone().json();
   const data = await dataResponse.clone().json();
-  if (release.productVersion !== "3.3.1" || release.engineVersion !== "common-vocab-engine/1.0.0" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
+  if (release.productVersion !== "3.4.0" || release.engineVersion !== "common-vocab-engine/1.0.0" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
     throw new Error("RELEASE_TUPLE_MISMATCH");
   }
   const html = await indexResponse.clone().text();

@@ -45,6 +45,7 @@ function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
   if (entity.quizEligible === false || entity.studyLayer === "reference") return false;
   if (mode === "foundation") return entity.targetBand === "Foundation";
   if (mode === "core") return entity.targetBand === "Core";
+  if (mode === "challenge") return entity.targetBand === "Challenge";
   if (mode === "frequent") return entity.observedFrequency >= 3 || entity.priority === "S";
   return true;
 }
