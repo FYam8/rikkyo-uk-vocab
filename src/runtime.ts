@@ -83,6 +83,18 @@ type CompactRow = [
   diagnosticEligible: boolean,
 ];
 
+export async function fetchReleaseAsset(baseUrl: string, path: string): Promise<Response> {
+  const separator = path.includes("?") ? "&" : "?";
+  const currentUrl = `${baseUrl}${path}${separator}appRelease=${encodeURIComponent(PRODUCT_VERSION)}`;
+  try {
+    const response = await fetch(currentUrl, { cache: "no-store" });
+    if (response.ok) return response;
+  } catch {
+    // An offline launch can still use the unversioned asset held by the active service worker.
+  }
+  return fetch(`${baseUrl}${path}`, { cache: "no-store" });
+}
+
 export interface GateReport {
   ok: boolean;
   reasons: string[];
@@ -181,25 +193,25 @@ function rowToEntity(row: CompactRow, enrichment: EnrichmentFile["entities"][str
 
 export async function loadRuntimeBundle(baseUrl: string): Promise<{ bundle: RuntimeBundle | null; gate: GateReport }> {
   try {
-    const releaseResponse = await fetch(`${baseUrl}release-manifest.json`, { cache: "no-store" });
+    const releaseResponse = await fetchReleaseAsset(baseUrl, "release-manifest.json");
     if (!releaseResponse.ok) throw new Error(`release:${releaseResponse.status}`);
     const release = await releaseResponse.json() as RuntimeBundle["release"];
-    const manifestResponse = await fetch(`${baseUrl}data/manifest.json`, { cache: "no-store" });
+    const manifestResponse = await fetchReleaseAsset(baseUrl, "data/manifest.json");
     if (!manifestResponse.ok) throw new Error(`manifest:${manifestResponse.status}`);
     const manifest = await manifestResponse.json() as CompactManifest;
     if (!Array.isArray(manifest.chunks) || manifest.chunks.length === 0) throw new Error("chunks");
 
-    const registryResponse = await fetch(`${baseUrl}data/registry.json`, { cache: "no-store" });
+    const registryResponse = await fetchReleaseAsset(baseUrl, "data/registry.json");
     if (!registryResponse.ok) throw new Error(`registry:${registryResponse.status}`);
     const stableIds = await registryResponse.json() as string[];
 
-    const enrichmentResponse = await fetch(`${baseUrl}data/${manifest.enrichment}`, { cache: "no-store" });
+    const enrichmentResponse = await fetchReleaseAsset(baseUrl, `data/${manifest.enrichment}`);
     if (!enrichmentResponse.ok) throw new Error(`enrichment:${enrichmentResponse.status}`);
     const enrichment = await enrichmentResponse.json() as EnrichmentFile;
     if (enrichment.format !== "rikkyo-vocab-enrichment/v1" || enrichment.version !== ENRICHMENT_VERSION || enrichment.entityCount !== CORE_ENTITY_COUNT) throw new Error("enrichment-contract");
 
     const chunkRows = await Promise.all(manifest.chunks.map(async (chunk) => {
-      const response = await fetch(`${baseUrl}data/${chunk}`, { cache: "no-store" });
+      const response = await fetchReleaseAsset(baseUrl, `data/${chunk}`);
       if (!response.ok) throw new Error(`${chunk}:${response.status}`);
       return response.json() as Promise<CompactRow[]>;
     }));
