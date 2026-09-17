@@ -73,7 +73,7 @@ jobs:
           manifest=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
           release=json.loads(Path('public/release-manifest.json').read_text())
           lock=json.loads(Path('common-engine.lock.json').read_text())
-          assert release['productVersion']=='3.5.1'
+          assert release['productVersion']=='3.5.2'
           assert release['persistenceSchemaVersion']==3
           assert release['exportFormatVersion']==3
           assert release['indexedDbVersion']==3
@@ -153,16 +153,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Wait for the v3.5.1 release on Pages
+      - name: Wait for the v3.5.2 release on Pages
         run: |
           for i in {1..30}; do
             version=$(curl -fsS "https://fyam8.github.io/rikkyo-uk-vocab/release-manifest.json?sha=${GITHUB_SHA}&attempt=${i}" | python -c 'import json,sys; print(json.load(sys.stdin).get("productVersion", ""))' || true)
-            if [ "$version" = "3.5.1" ]; then
+            if [ "$version" = "3.5.2" ]; then
               exit 0
             fi
             sleep 2
           done
-          echo "GitHub Pages did not publish v3.5.1 in time" >&2
+          echo "GitHub Pages did not publish v3.5.2 in time" >&2
           exit 1
 
       - name: Install production browser runtime

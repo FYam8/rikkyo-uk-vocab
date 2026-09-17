@@ -1,4 +1,4 @@
-const RELEASE = "3.5.1--common-vocab-engine-1.0.0--0.24.0-lexical--e2026-09-17-r2--p3";
+const RELEASE = "3.5.2--common-vocab-engine-1.0.0--0.24.0-lexical--e2026-09-17-r2--p3";
 const CACHE_NAME = `rikkyo-uk-vocab-${RELEASE}`;
 const SCOPE = "/rikkyo-uk-vocab/";
 
@@ -9,11 +9,11 @@ async function buildAtomicCache() {
   if (!releaseResponse.ok || !dataResponse.ok || !indexResponse.ok) throw new Error("RELEASE_TUPLE_FETCH_FAILED");
   const release = await releaseResponse.clone().json();
   const data = await dataResponse.clone().json();
-  if (release.productVersion !== "3.5.1" || release.engineVersion !== "common-vocab-engine/1.0.0" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
+  if (release.productVersion !== "3.5.2" || release.engineVersion !== "common-vocab-engine/1.0.0" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
     throw new Error("RELEASE_TUPLE_MISMATCH");
   }
   const html = await indexResponse.clone().text();
-  const assetPaths = [...html.matchAll(/(?:src|href)="(\.\/assets\/[^"]+)"/g)].map((m) => new URL(m[1], self.location.origin + SCOPE).pathname);
+  const assetPaths = [...html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)].map((m) => new URL(m[1], self.location.origin + SCOPE).pathname);
   const urls = [SCOPE, `${SCOPE}release-manifest.json`, `${SCOPE}data/manifest.json`, `${SCOPE}data/registry.json`, `${SCOPE}data/${data.enrichment}`,
     ...data.chunks.map((name) => `${SCOPE}data/${name}`), `${SCOPE}manifest.webmanifest`, ...assetPaths];
   const cache = await caches.open(CACHE_NAME);
@@ -33,5 +33,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE)) return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request, { cache: "no-store" }).then(async (response) => {
+      if (response.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(SCOPE, response.clone());
+      }
+      return response;
+    }).catch(async () => (await caches.match(SCOPE)) ?? Response.error()));
+    return;
+  }
   event.respondWith(caches.match(event.request).then((cached) => cached ?? fetch(event.request)));
 });

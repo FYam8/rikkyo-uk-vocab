@@ -9,7 +9,20 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.1" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.5.2" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
+
+  const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const legacyPage = await legacyContext.newPage();
+  const legacyUrl = new URL(baseURL);
+  legacyUrl.searchParams.set("legacy-shell", "v3.5.0");
+  await legacyPage.route(legacyUrl.href, (route) => route.fulfill({
+    contentType: "text/html",
+    body: '<!doctype html><html lang="ja"><body><div id="app"></div><script type="module" src="/rikkyo-uk-vocab/assets/index-CwJusQDL.js"></script></body></html>',
+  }));
+  await legacyPage.goto(legacyUrl.href, { waitUntil: "networkidle" });
+  await legacyPage.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await legacyContext.close();
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
   if (await page.locator("#schedule-filter").count()) throw new Error("A/B schedule output filter must not be shown");
@@ -185,7 +198,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.1 writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.5.2 stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

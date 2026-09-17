@@ -502,4 +502,8 @@ async function boot() {
   if ("serviceWorker" in navigator && import.meta.env.PROD) navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(console.error);
   await renderRoute();
 }
-void boot();
+void boot().catch((error) => {
+  console.error("Application startup failed", error);
+  root.innerHTML = `<main class="hero"><h1>画面を更新しています</h1><p>公開データの更新に失敗しました。学習履歴は消去されていません。</p><button class="primary" id="retry-startup">再読み込み</button></main>`;
+  document.querySelector("#retry-startup")?.addEventListener("click", () => location.reload());
+});
