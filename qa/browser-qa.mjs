@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "今日やること" }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.1.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.1.1" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
 

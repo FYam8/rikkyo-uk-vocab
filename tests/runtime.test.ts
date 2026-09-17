@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_ID, CORE_ENTITY_COUNT, DATASET_VERSION, ENGINE_VERSION, ENRICHMENT_VERSION, EXPORT_FORMAT_VERSION, INDEXED_DB_VERSION, PERSISTENCE_SCHEMA_VERSION, PRODUCT_VERSION, REGISTRY_ENTITY_COUNT } from "../src/config";
-import { validateRuntimeBundle, type RuntimeBundle } from "../src/runtime";
+import { fetchReleaseAsset, validateRuntimeBundle, type RuntimeBundle } from "../src/runtime";
+
+afterEach(() => vi.unstubAllGlobals());
 
 function validBundle(): RuntimeBundle {
   const registry = Array.from({ length: REGISTRY_ENTITY_COUNT }, (_, i) => ({ stableId: `fixed-${i}` }));
@@ -9,6 +11,21 @@ function validBundle(): RuntimeBundle {
 }
 
 describe("runtime data gate", () => {
+  it("bypasses an older service-worker cache with a release-qualified URL", async () => {
+    const current = { ok: true } as Response;
+    const fetchMock = vi.fn().mockResolvedValue(current);
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchReleaseAsset("/rikkyo-uk-vocab/", "data/manifest.json")).resolves.toBe(current);
+    expect(fetchMock).toHaveBeenCalledWith("/rikkyo-uk-vocab/data/manifest.json?appRelease=3.1.1", { cache: "no-store" });
+  });
+
+  it("falls back to the unversioned service-worker cache when offline", async () => {
+    const cached = { ok: true } as Response;
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError("offline")).mockResolvedValueOnce(cached);
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchReleaseAsset("/rikkyo-uk-vocab/", "data/manifest.json")).resolves.toBe(cached);
+    expect(fetchMock).toHaveBeenLastCalledWith("/rikkyo-uk-vocab/data/manifest.json", { cache: "no-store" });
+  });
   it("rejects a missing bundle", () => expect(validateRuntimeBundle(null).ok).toBe(false));
   it("rejects another appId", () => { const b = validBundle(); b.manifest.appId = "other"; expect(validateRuntimeBundle(b).ok).toBe(false); });
   it("requires dataVersion", () => { const b = validBundle(); b.manifest.dataVersion = ""; expect(validateRuntimeBundle(b).ok).toBe(false); });
