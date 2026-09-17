@@ -127,3 +127,43 @@ jobs:
       - name: Deploy Core 241
         id: deployment
         uses: actions/deploy-pages@v4
+
+  production-smoke:
+    if: github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Wait for the v3.1.1 release on Pages
+        run: |
+          for i in {1..30}; do
+            version=$(curl -fsS "https://fyam8.github.io/rikkyo-uk-vocab/release-manifest.json?sha=${GITHUB_SHA}&attempt=${i}" | python -c 'import json,sys; print(json.load(sys.stdin).get("productVersion", ""))' || true)
+            if [ "$version" = "3.1.1" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "GitHub Pages did not publish v3.1.1 in time" >&2
+          exit 1
+
+      - name: Install production browser runtime
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Production browser QA twice
+        env:
+          QA_BASE_URL: https://fyam8.github.io/rikkyo-uk-vocab/?release=${{ github.sha }}
+        run: |
+          QA_PASS=PRODUCTION-CLEAN-1 pnpm run qa:browser
+          QA_PASS=PRODUCTION-CLEAN-2 pnpm run qa:browser
