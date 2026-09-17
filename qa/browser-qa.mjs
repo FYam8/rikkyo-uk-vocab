@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.8" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.5.9" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -118,6 +118,51 @@ try {
   await clozePage.locator(".question-flags").getByText("復習", { exact: true }).waitFor();
   if (await clozePage.locator(".question-flags").getByText("acquisition", { exact: true }).count()) throw new Error("internal acquisition label is visible");
   await clozeContext.close();
+
+  const challengeContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const challengePage = await challengeContext.newPage();
+  await challengePage.goto(baseURL, { waitUntil: "networkidle" });
+  await challengePage.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await challengePage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(["meta", "plans"], "readwrite");
+      const preferences = tx.objectStore("meta").get("preferences");
+      const plans = tx.objectStore("plans").getAll();
+      preferences.onsuccess = () => tx.objectStore("meta").put({ ...preferences.result, studyMode: "challenge", sessionSize: 10 });
+      plans.onsuccess = () => plans.result.forEach((plan) => tx.objectStore("plans").put({ ...plan, acquisitionClosed: true, acquisitionUsed: 12, acquisitionCap: 12, acquisitionBudget: 12 }));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await challengePage.reload({ waitUntil: "networkidle" });
+  await challengePage.getByRole("button", { name: "学習を始める" }).click();
+  await challengePage.locator(".rich-choice").first().waitFor();
+  const challengeRun = await challengePage.evaluate(async () => {
+    const [enrichment, session] = await Promise.all([
+      fetch("./data/enrichment.json", { cache: "no-store" }).then((response) => response.json()),
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const get = request.result.transaction("sessions", "readonly").objectStore("sessions").get("active-session");
+          get.onsuccess = () => resolve(get.result);
+          get.onerror = () => reject(get.error);
+        };
+      }),
+    ]);
+    const queue = session?.queue ?? [];
+    return {
+      count: queue.length,
+      unique: new Set(queue.map((question) => question.stableId)).size,
+      allChallenge: queue.every((question) => enrichment.entities[question.stableId]?.targetBand === "Challenge"),
+      allFourChoice: queue.every((question) => question.kind === "meaningChoice" && question.choices.length === 4),
+    };
+  });
+  if (challengeRun.count !== 10 || challengeRun.unique !== 10 || !challengeRun.allChallenge || !challengeRun.allFourChoice) throw new Error(`closed-cap Challenge focus mismatch: ${JSON.stringify(challengeRun)}`);
+  await challengeContext.close();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
@@ -307,7 +352,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.8 one-word-per-session deduplication, Waseda-parity four-choice introduction, persisted-question refresh, audited cloze corpus, Japanese lane labels, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.5.9 closed-cap Challenge focus, one-word-per-session deduplication, Waseda-parity four-choice introduction, persisted-question refresh, audited cloze corpus, Japanese lane labels, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

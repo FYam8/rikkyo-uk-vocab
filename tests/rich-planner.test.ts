@@ -4,7 +4,7 @@ import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnost
 import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
 import type { QuestionRun, SkillState } from "../src/rich/types";
 
-function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : "Core"): RuntimeEntity {
+function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ? "Challenge" : i % 2 ? "Foundation" : "Core"): RuntimeEntity {
   return {
     stableId: `rik-test-${String(i).padStart(3, "0")}`,
     lemma: `word${i}`,
@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.8", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.9", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -86,6 +86,24 @@ describe("adaptive Phase 22 planner", () => {
     const b = bundle();
     const plan = { ...ensurePlan("g1", 1200), acquisitionClosed: true };
     expect(buildQueue(b, [], plan, new Date(), 10)).toHaveLength(0);
+  });
+
+  it("keeps an explicitly selected Challenge session available after the daily cap closes", () => {
+    const b = bundle();
+    const now = new Date("2026-09-17T12:00:00Z");
+    const plan = {
+      ...ensurePlan("g1", 1200, undefined, "Europe/London", now),
+      acquisitionClosed: true,
+      acquisitionUsed: 12,
+      introducedStableIds: b.core.slice(0, 12).map((item) => item.stableId),
+    };
+    const queue = buildQueue(b, [], plan, now, 10, { mode: "challenge" });
+    expect(queue).toHaveLength(10);
+    expect(queue.every((item) => item.entity.targetBand === "Challenge")).toBe(true);
+    expect(queue.every((item) => item.lane === "acquisition")).toBe(true);
+    expect(new Set(queue.map((item) => item.entity.stableId)).size).toBe(10);
+    const questions = queue.map((item) => makeQuestion(b, item, { allowAudio: false }));
+    expect(questions.every((question) => question.kind === "meaningChoice" && question.choices.length === 4)).toBe(true);
   });
 
   it("keeps same-session learning outside long-term FSRS until graduation", () => {

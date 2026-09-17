@@ -73,6 +73,7 @@ function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
 }
 export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: DailyPlanRecord, now = new Date(), limit = 60, options: StudyOptions = {}): PlannedItem[] {
   const mode = options.mode ?? "recommended";
+  const explicitBandFocus = mode === "foundation" || mode === "core" || mode === "challenge";
   const byKey = new Map(memory.map((x) => [x.key, x]));
   const nowMs = now.getTime();
   const items: PlannedItem[] = [];
@@ -91,14 +92,17 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
   items.length = 0;
   items.push(...uniqueItems);
 
-  if (!plan.acquisitionClosed && items.length < limit && mode !== "weak" && mode !== "review") {
+  // The daily acquisition cap governs automatic study. An explicitly selected
+  // band is intentional extra study, so it must not become an empty session
+  // merely because today's automatic introduction budget has been consumed.
+  if ((!plan.acquisitionClosed || explicitBandFocus) && items.length < limit && mode !== "weak" && mode !== "review") {
     const introduced = new Set(plan.introducedStableIds);
     const introducedSkills = new Set(plan.introducedSkillKeys ?? []);
     const activeEntities = new Set(memory.filter((x) => x.stage !== "provisional" && x.stage !== "acquisitionCandidate").map((x) => x.stableId));
     const newEntityCap = plan.newEntityCap ?? 12;
     const storedBudget = plan.acquisitionBudget ?? plan.acquisitionCap;
     const budgetLimit = Math.min(storedBudget, plan.acquisitionCap);
-    let remainingBudget = Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
+    let remainingBudget = explicitBandFocus ? limit - items.length : Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
     const queuedIds = new Set(items.map((item) => item.entity.stableId));
     const candidates = bundle.core
       .filter((e) => !queuedIds.has(e.stableId) && matchesEntity(e, mode) && skillsFor(e).some((s) => {
@@ -122,7 +126,7 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
       const skillToken = stateKey(entity.stableId, skillKey);
       if (introducedSkills.has(skillToken)) continue;
       const isNewEntity = !activeEntities.has(entity.stableId);
-      if (isNewEntity && !introduced.has(entity.stableId) && introduced.size >= newEntityCap) continue;
+      if (!explicitBandFocus && isNewEntity && !introduced.has(entity.stableId) && introduced.size >= newEntityCap) continue;
       const state = byKey.get(skillToken);
       items.push({ entity, skillKey, lane: "acquisition", ...(state ? { state } : {}) });
       queuedIds.add(entity.stableId);
