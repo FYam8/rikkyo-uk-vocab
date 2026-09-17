@@ -9,9 +9,22 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.2.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.3.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
+  if (await page.locator("#schedule-filter").count()) throw new Error("A/B schedule output filter must not be shown");
+
+  await page.locator("#session-size").selectOption("10");
+  await page.locator("#study-mode").selectOption("exam");
+  await page.getByRole("button", { name: "学習を始める" }).click();
+  await page.locator("#input-answer").waitFor();
+  await page.locator("#stop-session").click();
+  await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await page.getByRole("link", { name: /設定/ }).click();
+  await page.locator("#audio-questions").selectOption("off");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "設定を保存" }).click();
+  await page.getByRole("link", { name: /学習/ }).click();
 
   await page.locator("#session-size").selectOption("10");
   await page.locator("#study-mode").selectOption("random");
@@ -50,7 +63,7 @@ try {
       get.onsuccess = () => resolve(get.result ?? null); get.onerror = () => reject(get.error);
     };
   }));
-  if (!activeBeforeReload || activeBeforeReload.queue.length !== 11 || activeBeforeReload.wrong !== 1 || !activeBeforeReload.queue.some((q) => q.isRetry && q.retryOf === activeQuestion.questionInstanceId)) throw new Error("active session/retry queue mismatch before reload");
+  if (!activeBeforeReload || activeBeforeReload.queue.length !== 11 || activeBeforeReload.wrong !== 1 || !activeBeforeReload.queue.some((q) => q.isRetry && q.retryOf === activeQuestion.questionInstanceId) || activeBeforeReload.queue.some((q) => q.kind === "audioChoice" || q.kind === "audioInput")) throw new Error("active session/retry/audio fallback mismatch before reload");
 
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(500);
@@ -105,9 +118,11 @@ try {
   }));
   if (!backup?.complete || backup.rootHash?.length !== 64) throw new Error("browser backup root hash missing");
 
-  const navigation = page.waitForEvent("load");
+  let importDialog = "";
+  page.once("dialog", async (dialog) => { importDialog = dialog.message(); await dialog.dismiss(); });
+  const navigation = page.waitForEvent("load", { timeout: 15000 }).catch(() => null);
   await page.locator("#import-data").setInputFiles(exportPath);
-  await navigation;
+  if (!await navigation) throw new Error(`import did not reload${importDialog ? `: ${importDialog}` : ""}`);
   await page.waitForLoadState("networkidle");
   const imported = await page.evaluate(async () => new Promise((resolve, reject) => {
     const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
@@ -123,7 +138,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.2 Waseda-parity UI, retry queue, six-paper evidence, mobile, duplicate-grade, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.3 unified A/B, exam difficulty, audio fallback, Waseda-parity retry, six-paper evidence, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

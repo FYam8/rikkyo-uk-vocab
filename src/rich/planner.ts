@@ -39,10 +39,10 @@ export function ensurePlan(generationId: string, targetSeconds: number, existing
 }
 
 export interface PlannedItem { entity: RuntimeEntity; skillKey: SkillKey; lane: Lane; state?: SkillState; }
+export interface QuestionOptions { allowAudio?: boolean; intensity?: "adaptive" | "exam"; }
 export interface StudyOptions { mode?: StudyMode; schedule?: ScheduleFilter; }
-function matchesEntity(entity: RuntimeEntity, mode: StudyMode, schedule: ScheduleFilter): boolean {
+function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
   if (entity.quizEligible === false || entity.studyLayer === "reference") return false;
-  if (schedule !== "all" && !entity.schedules?.includes(schedule)) return false;
   if (mode === "foundation") return entity.targetBand === "Foundation";
   if (mode === "core") return entity.targetBand === "Core";
   if (mode === "frequent") return entity.observedFrequency >= 3 || entity.priority === "S";
@@ -50,11 +50,10 @@ function matchesEntity(entity: RuntimeEntity, mode: StudyMode, schedule: Schedul
 }
 export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: DailyPlanRecord, now = new Date(), limit = 60, options: StudyOptions = {}): PlannedItem[] {
   const mode = options.mode ?? "recommended";
-  const schedule = options.schedule ?? "all";
   const byKey = new Map(memory.map((x) => [x.key, x]));
   const nowMs = now.getTime();
   const items: PlannedItem[] = [];
-  for (const entity of bundle.core.filter((x) => matchesEntity(x, mode, schedule))) for (const skillKey of skillsFor(entity)) {
+  for (const entity of bundle.core.filter((x) => matchesEntity(x, mode))) for (const skillKey of skillsFor(entity)) {
     const state = byKey.get(stateKey(entity.stableId, skillKey));
     if (mode === "unlearned") continue;
     if (mode === "weak" && !(state && state.wrong > state.correct)) continue;
@@ -75,7 +74,7 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
     const budgetLimit = Math.min(storedBudget, plan.acquisitionCap);
     let remainingBudget = Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
     const candidates = bundle.core
-      .filter((e) => matchesEntity(e, mode, schedule) && skillsFor(e).some((s) => {
+      .filter((e) => matchesEntity(e, mode) && skillsFor(e).some((s) => {
         const existing = byKey.get(stateKey(e.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";
       }))
@@ -85,7 +84,8 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
 
     for (const entity of candidates) {
       if (items.length >= limit || remainingBudget <= 0) break;
-      const skillKey = skillsFor(entity).find((s) => {
+      const orderedSkills = mode === "exam" ? [...skillsFor(entity)].reverse() : skillsFor(entity);
+      const skillKey = orderedSkills.find((s) => {
         const existing = byKey.get(stateKey(entity.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";
       });
@@ -141,30 +141,45 @@ export function applyStudyAnswer(previous: SkillState, rating: "Again" | "Hard" 
 
 function distractors(bundle: RuntimeBundle, entity: RuntimeEntity): string[] {
   const answer = entity.senses[0]?.glossJa ?? "";
-  const pool = bundle.core.map((x) => x.senses[0]?.glossJa ?? "").filter((x, i, a) => x && x !== answer && a.indexOf(x) === i).sort((a, b) => stableNumber(`${entity.stableId}:${a}`) - stableNumber(`${entity.stableId}:${b}`));
+  const ranked = bundle.core.filter((x) => x.stableId !== entity.stableId).sort((a, b) => {
+    const score = (x: RuntimeEntity) => (x.pos === entity.pos ? 0 : 4) + (x.targetBand === entity.targetBand ? 0 : 2) + Math.min(3, Math.abs((x.senses[0]?.glossJa.length ?? 0) - answer.length) / 4);
+    return score(a) - score(b) || stableNumber(`${entity.stableId}:${a.stableId}`) - stableNumber(`${entity.stableId}:${b.stableId}`);
+  });
+  const pool = ranked.map((x) => x.senses[0]?.glossJa ?? "").filter((x, i, a) => x && x !== answer && a.indexOf(x) === i);
   return pool.slice(0, 3);
 }
 function lemmaDistractors(bundle: RuntimeBundle, entity: RuntimeEntity): string[] {
-  return bundle.core.filter((x) => x.stableId !== entity.stableId && x.targetBand === entity.targetBand)
+  return bundle.core.filter((x) => x.stableId !== entity.stableId)
+    .sort((a, b) => (a.pos === entity.pos ? 0 : 1) - (b.pos === entity.pos ? 0 : 1) || (a.targetBand === entity.targetBand ? 0 : 1) - (b.targetBand === entity.targetBand ? 0 : 1) || stableNumber(`${entity.stableId}:lemma:${a.stableId}`) - stableNumber(`${entity.stableId}:lemma:${b.stableId}`))
     .map((x) => x.lemma).filter((x, i, a) => x && a.indexOf(x) === i)
-    .sort((a, b) => stableNumber(`${entity.stableId}:lemma:${a}`) - stableNumber(`${entity.stableId}:lemma:${b}`)).slice(0, 3);
+    .slice(0, 3);
 }
-function questionKind(item: PlannedItem): QuestionKind {
+function questionKind(item: PlannedItem, options: QuestionOptions): QuestionKind {
+  const allowAudio = options.allowAudio !== false;
+  const strength = Math.max(0, (item.state?.correct ?? 0) - (item.state?.wrong ?? 0));
+  const roll = stableNumber(`${item.entity.stableId}:${item.skillKey}:${item.state?.correct ?? 0}:${item.state?.wrong ?? 0}`) % 100;
+  if (options.intensity === "exam") {
+    if (item.skillKey === "formProduction") return item.entity.cloze && roll < 60 ? "clozeInput" : "input";
+    return item.entity.cloze && roll < 72 ? "clozeChoice" : "meaningChoice";
+  }
   if (item.skillKey === "meaningRecognition") {
-    if (item.lane === "acquisition") return "meaningChoice";
-    const kinds: QuestionKind[] = item.entity.cloze ? ["meaningChoice", "audioChoice", "clozeChoice"] : ["meaningChoice", "audioChoice"];
-    return kinds[stableNumber(`${item.entity.stableId}:${item.state?.correct ?? 0}:${item.state?.wrong ?? 0}`) % kinds.length]!;
+    if (item.lane === "acquisition") return item.entity.cloze && roll < 45 ? "clozeChoice" : roll < 75 ? "reverseChoice" : "meaningChoice";
+    if (item.entity.cloze && roll < (strength >= 2 ? 68 : 45)) return "clozeChoice";
+    if (allowAudio && strength >= 2 && roll >= 82) return "audioChoice";
+    return "meaningChoice";
   }
   if (item.lane === "acquisition") return "reverseChoice";
-  const kinds: QuestionKind[] = ["reverseChoice", "input", "audioInput"];
-  return kinds[stableNumber(`${item.entity.stableId}:${item.state?.correct ?? 0}:${item.state?.wrong ?? 0}`) % kinds.length]!;
+  if (item.entity.cloze && strength >= 1 && roll < 45) return "clozeInput";
+  if (allowAudio && strength >= 2 && roll >= 85) return "audioInput";
+  return strength === 0 && roll < 45 ? "reverseChoice" : "input";
 }
-export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem): QuestionRun {
+export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem, options: QuestionOptions = {}): QuestionRun {
   const meaning = item.entity.senses[0]?.glossJa ?? "";
   const id = crypto.randomUUID();
-  const kind = questionKind(item);
+  const kind = questionKind(item, options);
   const sourceLabel = item.entity.sourceExample ? `FY${String(item.entity.sourceExample.year).slice(-2)} ${item.entity.sourceExample.schedule} · PDF p.${item.entity.sourceExample.page}` : item.entity.generatedExample ? "立教傾向から生成" : undefined;
   if (kind === "input" || kind === "audioInput") return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: meaning, choices: [], answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
+  if (kind === "clozeInput" && item.entity.cloze) return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: "空所に入る語句を入力してください", context: item.entity.cloze.sentence, choices: [], answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
   if (kind === "reverseChoice") {
     const choices = [item.entity.lemma, ...lemmaDistractors(bundle, item.entity)].sort((a, b) => stableNumber(`${id}:${a}`) - stableNumber(`${id}:${b}`));
     return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: meaning, choices, answer: item.entity.lemma, ...(sourceLabel ? { sourceLabel } : {}) };
@@ -175,6 +190,19 @@ export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem): Question
   }
   const choices = [meaning, ...distractors(bundle, item.entity)].sort((a, b) => stableNumber(`${id}:${a}`) - stableNumber(`${id}:${b}`));
   return { questionInstanceId: id, stableId: item.entity.stableId, skillKey: item.skillKey, lane: item.lane, kind, prompt: item.entity.lemma, choices, answer: meaning, ...(sourceLabel ? { sourceLabel } : {}) };
+}
+
+export function retryGap(entity: RuntimeEntity): 6 | 8 { return entity.priority === "S" || entity.targetBand === "Foundation" ? 6 : 8; }
+export function makeRetryQuestion(bundle: RuntimeBundle, original: QuestionRun, entity: RuntimeEntity): QuestionRun {
+  const questionInstanceId = crypto.randomUUID();
+  const { context: _context, ...base } = original;
+  if (original.skillKey === "formProduction") {
+    const choices = [entity.lemma, ...lemmaDistractors(bundle, entity)].sort((a, b) => stableNumber(`${questionInstanceId}:${a}`) - stableNumber(`${questionInstanceId}:${b}`));
+    return { ...base, questionInstanceId, kind: "reverseChoice", prompt: entity.senses[0]?.glossJa ?? "", choices, answer: entity.lemma, isRetry: true, retryOf: original.questionInstanceId };
+  }
+  const answer = entity.senses[0]?.glossJa ?? "";
+  const choices = [answer, ...distractors(bundle, entity)].sort((a, b) => stableNumber(`${questionInstanceId}:${a}`) - stableNumber(`${questionInstanceId}:${b}`));
+  return { ...base, questionInstanceId, kind: "meaningChoice", prompt: entity.lemma, choices, answer, isRetry: true, retryOf: original.questionInstanceId };
 }
 
 export function normalizeAnswer(value: string): string { return value.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " "); }

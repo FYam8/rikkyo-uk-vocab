@@ -3,9 +3,9 @@ import "./rich/styles.css";
 import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./runtime";
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, stateKey } from "./rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, retryGap, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
-import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, ScheduleFilter, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
+import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
 import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
 import { PRODUCT_VERSION, SCHEDULER_CONFIG } from "./config";
 import type { CanonicalReviewPayload } from "./rich/types";
@@ -64,6 +64,16 @@ function speak(text: string) {
   if (selected) u.voice = selected;
   u.rate = 0.88;
   speechSynthesis.speak(u);
+}
+function audioQuestionsEnabled(preferences: Preferences): boolean {
+  if (preferences.audioQuestions === "off") return false;
+  if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) return false;
+  return true;
+}
+function removeAudioRequirement(q: QuestionRun): QuestionRun {
+  if (q.kind === "audioChoice") return { ...q, kind: "meaningChoice" };
+  if (q.kind === "audioInput") return { ...q, kind: "input" };
+  return q;
 }
 function download(name: string, text: string) {
   const a = document.createElement("a");
@@ -138,9 +148,8 @@ async function renderHome() {
   root.innerHTML = homeView({ bundle: ctx.bundle, plan: s.plan, memory: s.memory, answeredToday: todayAnswered(s.events, s.preferences.learningTimeZone), activeSeconds: s.plan.activeStudySeconds ?? 0, diagnosticCompleted: s.preferences.diagnosticCompleted, preferences: s.preferences });
   document.querySelector("#start-study")?.addEventListener("click", () => void startStudy());
   document.querySelector("#start-diagnostic")?.addEventListener("click", () => void startDiagnostic());
-  const mode = document.querySelector<HTMLSelectElement>("#study-mode"), schedule = document.querySelector<HTMLSelectElement>("#schedule-filter"), size = document.querySelector<HTMLSelectElement>("#session-size");
+  const mode = document.querySelector<HTMLSelectElement>("#study-mode"), size = document.querySelector<HTMLSelectElement>("#session-size");
   mode?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { studyMode: mode.value as StudyMode }));
-  schedule?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { scheduleFilter: schedule.value as ScheduleFilter }));
   size?.addEventListener("change", () => void savePreferences(ctx!.db, ctx!.writer, { sessionSize: Number(size.value) }));
 }
 async function renderWords() {
@@ -185,10 +194,12 @@ async function startStudy() {
   const s = await state();
   const plan = effectivePlan(s.plan, s.preferences, s.memory);
   const requested = s.preferences.sessionSize ?? 20;
-  const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), requested === 0 ? 60 : requested, { mode: s.preferences.studyMode ?? "recommended", schedule: s.preferences.scheduleFilter ?? "all" });
+  const studyMode = s.preferences.studyMode ?? "recommended";
+  const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), requested === 0 ? 60 : requested, { mode: studyMode });
   if (!items.length) return alert("現在出題できる項目はありません。");
   const now = new Date().toISOString();
-  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x)), index: 0, shownAt: Date.now(), diagnostics: [], baseTotal: items.length, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: new Set() };
+  const allowAudio = audioQuestionsEnabled(s.preferences);
+  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x, { allowAudio, intensity: studyMode === "exam" ? "exam" : "adaptive" })), index: 0, shownAt: Date.now(), diagnostics: [], baseTotal: items.length, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: new Set() };
   await checkpointSession(0, "SessionStarted");
   location.hash = "study";
   await renderQuestion();
@@ -219,6 +230,12 @@ async function renderQuestion() {
   const e = entity(q.stableId);
   root.innerHTML = questionView(q, e, session.index, session.queue.length, session.mode, { correct: session.correct, wrong: session.wrong, baseTotal: session.baseTotal }, session.feedback);
   document.querySelector("#speak-word")?.addEventListener("click", () => speak(e.lemma));
+  document.querySelector("#audio-fallback")?.addEventListener("click", () => void (async () => {
+    if (!session) return;
+    session.queue[session.index] = removeAudioRequirement(q);
+    await checkpointSession(session.index, "AudioQuestionSkipped");
+    await renderQuestion();
+  })());
   document.querySelector("#stop-session")?.addEventListener("click", () => void (async () => {
     if (!ctx) return;
     await clearActiveSession(ctx.db, ctx.writer, "user-stop");
@@ -298,8 +315,8 @@ async function answer(given: string) {
     session.wrong += 1;
     session.missedStableIds.add(q.stableId);
     if (session.mode === "study" && !q.isRetry) {
-      const retry: QuestionRun = { ...q, questionInstanceId: crypto.randomUUID(), isRetry: true, retryOf: q.questionInstanceId };
-      session.queue.splice(Math.min(session.index + 4, session.queue.length), 0, retry);
+      const retry = makeRetryQuestion(ctx.bundle, q, entity(q.stableId));
+      session.queue.splice(Math.min(session.index + retryGap(entity(q.stableId)) + 1, session.queue.length), 0, retry);
     }
   }
   if (q.isRetry) session.retryAnswered += 1;
@@ -336,10 +353,11 @@ function bindSettings() {
     const exam = document.querySelector<HTMLInputElement>("#exam-date")?.value || null;
     const accent = (document.querySelector<HTMLSelectElement>("#accent")?.value || "auto") as "auto" | "gb" | "us";
     const voiceURI = document.querySelector<HTMLSelectElement>("#voice")?.value || "";
+    const audioQuestions = (document.querySelector<HTMLSelectElement>("#audio-questions")?.value || "auto") as "auto" | "on" | "off";
     const theme = (document.querySelector<HTMLSelectElement>("#theme")?.value || "auto") as "auto" | "light" | "dark";
     if (min < 5 || min > 120) return alert("1日の目安は5〜120分です。");
     try { new Intl.DateTimeFormat("en", { timeZone: tz }).format(new Date()); } catch { return alert("タイムゾーンが不正です。"); }
-    await savePreferences(ctx!.db, ctx!.writer, { dailyTargetSeconds: min * 60, learningTimeZone: tz, examDate: exam, accent, voiceURI, theme });
+    await savePreferences(ctx!.db, ctx!.writer, { dailyTargetSeconds: min * 60, learningTimeZone: tz, examDate: exam, accent, voiceURI, theme, audioQuestions });
     applyTheme(theme);
     alert("保存しました。");
     await renderSettings();
@@ -398,7 +416,7 @@ function populateVoices(prefs: Preferences) {
   speechSynthesis.addEventListener("voiceschanged", render, { once: true });
 }
 
-async function recoverSession(initialEvents: DomainEvent[], generationId: string) {
+async function recoverSession(initialEvents: DomainEvent[], generationId: string, preferences: Preferences) {
   if (!ctx?.writable) return;
   const stored = await loadActiveSession(ctx.db);
   if (!stored) return;
@@ -418,7 +436,7 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     sessionId: stored.sessionId,
     startedAt: stored.startedAt,
     mode: stored.mode,
-    queue: stored.queue,
+    queue: audioQuestionsEnabled(preferences) ? stored.queue : stored.queue.map(removeAudioRequirement),
     index: resumeIndex,
     shownAt: Date.now(),
     diagnostics: diagnosticEvents.map((e) => ({ correct: e.payload.correct === true })),
@@ -449,7 +467,8 @@ async function boot() {
     const q = e.payload?.questionInstanceId;
     if (typeof q === "string") graded.add(q);
   }
-  await recoverSession(s.events, generation.generationId);
+  activePreferences = s.preferences ?? null;
+  await recoverSession(s.events, generation.generationId, s.preferences!);
   window.addEventListener("hashchange", () => void renderRoute());
   window.addEventListener("pagehide", () => { writer.close(); db.close(); }, { once: true });
   if ("serviceWorker" in navigator && import.meta.env.PROD) navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(console.error);
