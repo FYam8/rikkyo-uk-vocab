@@ -7,13 +7,13 @@ import { VOCABULARY_SESSION_ENGINE } from "../src/common-engine/session-orchestr
 
 describe("v3 frozen compatibility contract", () => {
   it("keeps product, persistence, export and IndexedDB versions independent", () => {
-    expect(PRODUCT_VERSION).toBe("3.4.0");
+    expect(PRODUCT_VERSION).toBe("3.5.0");
     expect(ENGINE_VERSION).toBe("common-vocab-engine/1.0.0");
     expect(PERSISTENCE_SCHEMA_VERSION).toBe(3);
     expect(EXPORT_FORMAT_VERSION).toBe(3);
     expect(INDEXED_DB_VERSION).toBe(3);
     expect(EXPORT_FORMAT).toBe("rikkyo-uk-vocab-export/v3");
-    expect(RELEASE_TUPLE.datasetVersion).toBe("0.23.0-reselected");
+    expect(RELEASE_TUPLE.datasetVersion).toBe("0.24.0-lexical");
   });
 
   it("pins a vendored Common Engine instead of hotlinking Waseda Pages", () => {

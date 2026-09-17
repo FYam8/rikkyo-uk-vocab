@@ -47,7 +47,7 @@ export interface RuntimeBundle {
     dataVersion: string;
     registryEntityCount: number;
     coreEntityCount: number;
-    generatedFromPhase: 23;
+    generatedFromPhase: 24;
     enrichmentVersion: string;
     sourcePapers: string[];
   };
@@ -125,7 +125,7 @@ export function validateRuntimeBundle(value: unknown): GateReport {
   if (!nonEmpty(manifest?.dataVersion)) reasons.push("manifest.dataVersionがありません。");
   if (manifest?.registryEntityCount !== REGISTRY_ENTITY_COUNT) reasons.push(`Registryは${REGISTRY_ENTITY_COUNT}件である必要があります。`);
   if (manifest?.coreEntityCount !== CORE_ENTITY_COUNT) reasons.push(`Coreは${CORE_ENTITY_COUNT}件である必要があります。`);
-  if (manifest?.generatedFromPhase !== 23) reasons.push("Phase 23再選定データであることを確認できません。");
+  if (manifest?.generatedFromPhase !== 24) reasons.push("Phase 24語彙難度再々選定データであることを確認できません。");
   if (manifest?.enrichmentVersion !== ENRICHMENT_VERSION) reasons.push("過去問enrichment版が一致しません。");
   if (!Array.isArray(manifest?.sourcePapers) || manifest.sourcePapers.length !== 6) reasons.push("FY24-FY26 A/Bの6冊を確認できません。");
 

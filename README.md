@@ -7,9 +7,10 @@
 FY24〜FY26の英語6冊を再監査し、本文注釈語・定型指示・初歩語の過大評価を除いて再選定したCore 241をGitHub Pagesへ自動公開します。
 
 - Core release: **241 entities**
-- Stable-ID Registry: **801 IDs**（旧623 IDをすべて保持）
-- Data version: **0.23.0-reselected**
-- Difficulty bands: **Foundation 40 / Core 162 / Challenge 39**
+- Stable-ID Registry: **912 IDs**（旧801 IDをすべて保持）
+- Data version: **0.24.0-lexical**
+- Difficulty bands: **Foundation 30 / Core 151 / Challenge 60**
+- Difficulty policy: 得点層ではなく語彙そのものの難度で区分し、過去問テーマから転移語彙を補充
 - Scheduler: **FSRS-6 / ts-fsrs 5.4.2 / desired retention 0.90 / fuzz off / short-term FSRS off**
 - Memory key: **stableId × skillKey**
 - Learning lanes: **learning / relearning / provisional / review / acquisition**
@@ -29,7 +30,7 @@ FY24〜FY26の英語6冊を再監査し、本文注釈語・定型指示・初�
 Pages workflowは公開前に次を検証します。
 
 - 241 / 241 Core entity
-- 801 / 801 stable-ID Registry（旧IDの削除・再利用なし）
+- 912 / 912 stable-ID Registry（旧IDの削除・再利用なし）
 - TypeScript production build
 - automated tests
 - adaptive queue / short-term learning / diagnostic policy

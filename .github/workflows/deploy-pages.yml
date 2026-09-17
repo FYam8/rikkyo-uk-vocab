@@ -33,7 +33,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Verify Phase 23 reselected Core data
+      - name: Verify Phase 24 lexical Core data
         run: |
           python - <<'PY'
           import json
@@ -45,10 +45,10 @@ jobs:
           for name in manifest['chunks']:
               rows.extend(json.loads((base/name).read_text(encoding='utf-8')))
           assert manifest['appId'] == 'rikkyo-uk-vocab'
-          assert manifest['dataVersion'] == '0.23.0-reselected'
-          assert manifest['generatedFromPhase'] == 23
-          assert len(registry) == 801
-          assert len(set(registry)) == 801
+          assert manifest['dataVersion'] == '0.24.0-lexical'
+          assert manifest['generatedFromPhase'] == 24
+          assert len(registry) == 912
+          assert len(set(registry)) == 912
           assert len(rows) == 241
           ids = [r[0] for r in rows]
           assert len(set(ids)) == 241
@@ -58,7 +58,10 @@ jobs:
           assert len({r[1].lower() for r in rows}) == 241
           assert {r[6] for r in rows} == {'Foundation', 'Core', 'Challenge'}
           assert all(r[7] == ['A', 'B'] for r in rows)
-          print('Stable Registry: 801/801 PASS')
+          assert sum(r[6] == 'Foundation' for r in rows) == 30
+          assert sum(r[6] == 'Core' for r in rows) == 151
+          assert sum(r[6] == 'Challenge' for r in rows) == 60
+          print('Stable Registry: 912/912 PASS')
           PY
 
       - name: Verify v3 release and Common Engine pin
@@ -70,16 +73,17 @@ jobs:
           manifest=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
           release=json.loads(Path('public/release-manifest.json').read_text())
           lock=json.loads(Path('common-engine.lock.json').read_text())
-          assert release['productVersion']=='3.4.0'
+          assert release['productVersion']=='3.5.0'
           assert release['persistenceSchemaVersion']==3
           assert release['exportFormatVersion']==3
           assert release['indexedDbVersion']==3
-          assert release['datasetVersion']=='0.23.0-reselected'
-          assert release['enrichmentVersion']=='2026-09-17-reselected-v1'
+          assert release['datasetVersion']=='0.24.0-lexical'
+          assert release['enrichmentVersion']=='2026-09-17-reselected-v2'
           assert manifest['enrichmentVersion']==release['enrichmentVersion']
           enrichment=json.loads((base/manifest['enrichment']).read_text(encoding='utf-8'))
           assert enrichment['entityCount']==241
-          assert enrichment['sourceMatchedEntityCount']==228
+          assert enrichment['sourceMatchedEntityCount']==132
+          assert sum(x.get('selectionOrigin') == 'rikkyo-transfer' for x in enrichment['entities'].values()) >= 105
           assert lock['sourceCommit']=='3e6fcb1701e721ccaf070df915446004f7f312ef'
           assert lock['hotlink'] is False
           print('v3 release tuple and Common Engine pin: PASS')
@@ -149,16 +153,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Wait for the v3.4.0 release on Pages
+      - name: Wait for the v3.5.0 release on Pages
         run: |
           for i in {1..30}; do
             version=$(curl -fsS "https://fyam8.github.io/rikkyo-uk-vocab/release-manifest.json?sha=${GITHUB_SHA}&attempt=${i}" | python -c 'import json,sys; print(json.load(sys.stdin).get("productVersion", ""))' || true)
-            if [ "$version" = "3.4.0" ]; then
+            if [ "$version" = "3.5.0" ]; then
               exit 0
             fi
             sleep 2
           done
-          echo "GitHub Pages did not publish v3.4.0 in time" >&2
+          echo "GitHub Pages did not publish v3.5.0 in time" >&2
           exit 1
 
       - name: Install production browser runtime

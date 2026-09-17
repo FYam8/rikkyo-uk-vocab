@@ -15,6 +15,12 @@ const OCR_META = {
 const EXCLUDE = new Set([
   "afternoon", "animal", "anything", "apple", "ask", "away", "baby", "back", "bad", "bed", "bedroom", "big", "bird", "book", "boy", "brother", "buy", "call", "car", "cat", "chair", "clean", "coffee", "come", "cook", "country", "cry", "cut", "day", "dinner", "door", "eat", "example", "father", "feed", "female", "find", "finish", "flower", "fly", "food", "football", "friend", "full", "game", "garden", "get", "girl", "go", "good", "grandfather", "great", "grow", "gym", "hand", "happy", "hear", "help", "home", "hour", "house", "idea", "jump", "kid", "know", "last", "laugh", "learn", "library", "like", "little", "live", "look", "love", "make", "man", "money", "morning", "mother", "mountain", "move", "mum", "name", "need", "new", "news", "next", "night", "noon", "old", "open", "parent", "party", "path", "people", "phone", "picture", "piece", "plant", "player", "put", "read", "robin", "room", "rose", "run", "sad", "say", "school", "see", "sell", "shop", "sit", "sleep", "small", "someone", "something", "sorry", "speak", "stand", "start", "station", "stop", "story", "student", "summer", "table", "take", "talk", "tall", "tell", "thank", "thanks", "thing", "think", "time", "tomorrow", "town", "tree", "use", "village", "visit", "wait", "walk", "want", "watch", "water", "week", "window", "word", "work", "world", "write", "year", "yesterday", "young",
   "day in and day out", "get rid of", "get stuck", "once upon a time",
+  // Phase 24: elementary items, sense-mismatched OCR hits and redundant
+  // derivatives. These IDs stay in the registry/history, but not the queue.
+  "able", "alive", "anymore", "arrive", "body", "borrow", "bring", "building", "care", "carry", "club", "correct", "course", "dead", "die", "different", "difficult", "doctor", "early", "else", "enjoy", "enough", "everything", "famous", "feel", "finally", "forget", "free", "front", "future", "glad", "ground", "happen", "healthy", "inside", "interested", "kindness", "listen", "long", "lot", "lovely", "lucky", "month", "often", "outside", "pleased", "present", "problem", "quickly", "quietly", "really", "repair", "return", "shoulder", "slowly", "sometimes", "somewhere", "soon", "stay", "strong", "study", "suddenly", "surprised", "teach", "together", "toward", "understand", "until", "voice", "warm", "wear", "weather", "well", "writer",
+  "recording", "recycling", "industrial", "revolution", "local community",
+  "angry", "at first", "be afraid of", "catch a cold", "come from", "for example",
+  "help with", "in the past", "sick", "size",
 ]);
 const SOURCE_EXAMPLE_EXCLUDE = new Set(["allow", "catch", "choose", "close", "follow", "for example", "in order to", "miss", "sometimes", "source"]);
 
@@ -24,9 +30,9 @@ const MANUAL = [
   ["nutrient", "栄養素", "noun", "Challenge"],
   ["recyclable", "リサイクル可能な", "adjective", "Challenge"],
   ["wildlife", "野生生物", "noun", "Core"],
-  ["mammal", "哺乳類", "noun", "Challenge"],
+  ["mammal", "哺乳類", "noun", "Core"],
   ["electricity", "電気", "noun", "Core"],
-  ["biology", "生物学", "noun", "Challenge"],
+  ["biology", "生物学", "noun", "Core"],
   ["practical", "実用的な、実践的な", "adjective", "Core"],
   ["document", "文書、資料", "noun", "Core"],
   ["source", "情報源、資料", "noun", "Core"],
@@ -35,7 +41,7 @@ const MANUAL = [
   ["photograph", "写真", "noun", "Core"],
   ["challenge", "課題、難題", "noun", "Core"],
   ["rubbish", "ごみ", "noun", "Core"],
-  ["sample", "試料、サンプル", "noun", "Challenge"],
+  ["sample", "試料、サンプル", "noun", "Core"],
   ["industrial", "工業の、産業の", "adjective", "Challenge"],
   ["revolution", "革命", "noun", "Challenge"],
   ["presentation", "発表、プレゼンテーション", "noun", "Core"],
@@ -56,6 +62,135 @@ const MANUAL = [
   ["local community", "地域社会", "phrase", "Core"],
   ["climate change", "気候変動", "phrase", "Challenge"],
   ["Industrial Revolution", "産業革命", "proper noun", "Challenge"],
+];
+
+// Difficulty is lexical difficulty, not Waseda's target-score field.  The
+// Foundation set is deliberately small and contains grammar/reading anchors.
+const FOUNDATION_KEEP = new Set([
+  "afraid", "agree", "begin", "believe", "cost", "even if", "even though",
+  "human", "important", "in order to", "instead", "invite", "join", "local",
+  "memory", "mistake", "notice", "order", "poor", "prepare", "reach", "result",
+  "seem", "solve", "spend", "suggest", "trouble", "up to", "usually", "yet",
+]);
+const CHALLENGE_KEEP = new Set(["influence", "investigate"]);
+
+// Rikkyo-themed transfer vocabulary.  Every item is useful without audio and
+// is tagged by lexical difficulty independently of occurrence or score band.
+const TRANSFER = [
+  // Core transfer and task language
+  ["ability", "能力", "noun", "Core", "The task asks you to imagine a new ability.", "その課題では新しい能力を想像するよう求めています。"],
+  ["available", "利用できる、都合がつく", "adjective", "Core", "The new books are available in the reading section.", "新しい本は閲覧コーナーで利用できます。"],
+  ["participate", "参加する", "verb", "Core", "Students can participate in the park clean-up.", "生徒は公園の清掃活動に参加できます。"],
+  ["suitable", "適した", "adjective", "Core", "The workshop is suitable for students who enjoy writing.", "その講座は作文を楽しむ生徒に適しています。"],
+  ["provide", "提供する", "verb", "Core", "The school provides equipment for the experiment.", "学校は実験用の器具を提供します。"],
+  ["improve", "改善する、上達させる", "verb", "Core", "Regular practice can improve your writing.", "定期的な練習で作文力を向上させられます。"],
+  ["develop", "発達させる、開発する", "verb", "Core", "The project helped students develop research skills.", "その活動は生徒が調査技能を伸ばす助けになりました。"],
+  ["require", "必要とする、要求する", "verb", "Core", "The experiment requires three different materials.", "その実験には3種類の材料が必要です。"],
+  ["include", "含む", "verb", "Core", "The report should include evidence from the experiment.", "報告書には実験の証拠を含めるべきです。"],
+  ["increase", "増加する、増やす", "verb", "Core", "More light may increase plant growth.", "光を増やすと植物の成長が促される場合があります。"],
+  ["decrease", "減少する、減らす", "verb", "Core", "The amount of waste decreased after the campaign.", "活動後に廃棄物の量が減少しました。"],
+  ["create", "作り出す", "verb", "Core", "The class created a poster for the exhibition.", "クラスは展示会用のポスターを作りました。"],
+  ["organise", "計画・整理する", "verb", "Core", "Students organised the results in a table.", "生徒たちは結果を表に整理しました。"],
+  ["communicate", "伝える、意思疎通する", "verb", "Core", "A clear graph communicates the result quickly.", "明確なグラフは結果をすばやく伝えます。"],
+  ["community", "地域社会、共同体", "noun", "Core", "The local community supported the clean-up.", "地域社会が清掃活動を支援しました。"],
+  ["behaviour", "行動、振る舞い", "noun", "Core", "The students observed the birds' behaviour.", "生徒たちは鳥の行動を観察しました。"],
+  ["purpose", "目的", "noun", "Core", "The purpose of the experiment was to test plant growth.", "実験の目的は植物の成長を調べることでした。"],
+  ["advantage", "利点", "noun", "Core", "One advantage of recycling is reduced waste.", "リサイクルの利点の一つは廃棄物を減らせることです。"],
+  ["disadvantage", "欠点、不利な点", "noun", "Core", "The report also explains one disadvantage.", "報告書は欠点も一つ説明しています。"],
+  ["opportunity", "機会", "noun", "Core", "The workshop gives students an opportunity to practise.", "その講座は生徒に練習の機会を与えます。"],
+  ["responsibility", "責任", "noun", "Core", "Protecting wildlife is a shared responsibility.", "野生生物を守ることは共通の責任です。"],
+  ["instruction", "指示、説明", "noun", "Core", "Read each instruction before answering.", "解答前に各指示を読みなさい。"],
+  ["survey", "調査、アンケート", "noun", "Core", "The students carried out a survey about transport.", "生徒たちは交通について調査を行いました。"],
+  ["report", "報告書／報告する", "noun/verb", "Core", "The group wrote a report on climate change.", "グループは気候変動について報告書を書きました。"],
+  ["decision", "決定、判断", "noun", "Core", "Her decision changed the result of the story.", "彼女の決断が物語の結末を変えました。"],
+  ["adventure", "冒険", "noun", "Core", "The mysterious door began an unexpected adventure.", "不思議な扉から予想外の冒険が始まりました。"],
+  ["century", "世紀", "noun", "Core", "The invention changed life in the nineteenth century.", "その発明は19世紀の生活を変えました。"],
+  ["society", "社会", "noun", "Core", "New technology can change society.", "新しい技術は社会を変えることがあります。"],
+  ["factory", "工場", "noun", "Core", "Factories produced goods more quickly.", "工場は製品をより速く生産しました。"],
+  ["transport", "交通、輸送", "noun", "Core", "Railways transformed transport during the period.", "鉄道はその時代の交通を変えました。"],
+  ["oxygen", "酸素", "noun", "Core", "Plants release oxygen during photosynthesis.", "植物は光合成で酸素を放出します。"],
+  ["temperature", "温度", "noun", "Core", "The class measured the temperature every hour.", "クラスは毎時間温度を測定しました。"],
+  ["surface", "表面", "noun", "Core", "Water remained on the surface of the clay.", "水は粘土の表面に残りました。"],
+  ["liquid", "液体", "noun/adjective", "Core", "The students measured the liquid carefully.", "生徒たちは液体を注意深く測りました。"],
+  ["root", "根、根本", "noun", "Core", "Plant roots absorb water from the soil.", "植物の根は土から水を吸収します。"],
+  ["sunlight", "日光", "noun", "Core", "The plant in sunlight grew tall and green.", "日光の下の植物は高く緑色に育ちました。"],
+  ["clay", "粘土", "noun", "Core", "The plants in clay remained small.", "粘土の植物は小さいままでした。"],
+  ["microscope", "顕微鏡", "noun", "Core", "They examined the sample under a microscope.", "彼らは顕微鏡で試料を調べました。"],
+  ["control", "制御する／対照", "verb/noun", "Core", "The experiment used one plant as a control.", "その実験では植物一つを対照として使いました。"],
+  ["calculate", "計算する", "verb", "Core", "Calculate the average growth of the plants.", "植物の平均成長量を計算しなさい。"],
+  ["classify", "分類する", "verb", "Core", "Classify the materials into three groups.", "材料を3つの群に分類しなさい。"],
+  ["examine", "詳しく調べる", "verb", "Core", "The students examined each soil sample.", "生徒たちは各土壌試料を詳しく調べました。"],
+  ["observe", "観察する", "verb", "Core", "Observe how the plant changes over one week.", "1週間で植物がどう変化するか観察しなさい。"],
+  ["predict", "予測する", "verb", "Core", "Predict which plant will grow fastest.", "どの植物が最も速く育つか予測しなさい。"],
+  ["assignment", "課題、宿題", "noun", "Core", "The history assignment is due on Monday.", "歴史の課題は月曜日が提出期限です。"],
+  ["deadline", "締切", "noun", "Core", "The group finished the slides before the deadline.", "グループは締切前にスライドを完成させました。"],
+  ["laboratory", "実験室", "noun", "Core", "The class met in the science laboratory.", "クラスは理科実験室に集まりました。"],
+  ["accurate", "正確な", "adjective", "Core", "Accurate measurements make the result reliable.", "正確な測定は結果の信頼性を高めます。"],
+  ["alternative", "代わりのもの、別の選択肢", "noun/adjective", "Core", "The group considered an alternative method.", "グループは別の方法を検討しました。"],
+  ["approach", "方法、取り組み方", "noun", "Core", "The two groups used a different approach.", "2つのグループは異なる取り組み方を使いました。"],
+  ["benefit", "利益、恩恵／役立つ", "noun/verb", "Core", "Recycling provides a benefit to the community.", "リサイクルは地域社会に恩恵をもたらします。"],
+  ["cause", "原因／引き起こす", "noun/verb", "Core", "The class discussed the cause of the change.", "クラスは変化の原因を話し合いました。"],
+  ["effect", "影響、効果", "noun", "Core", "The experiment measured the effect of light.", "その実験は光の影響を測定しました。"],
+  ["relationship", "関係、関連", "noun", "Core", "The graph shows a relationship between light and growth.", "グラフは光と成長の関係を示しています。"],
+  ["pattern", "型、傾向", "noun", "Core", "A clear pattern appeared in the results.", "結果に明確な傾向が現れました。"],
+  ["trend", "傾向", "noun", "Core", "The data showed an upward trend.", "データは上昇傾向を示しました。"],
+  ["gradual", "徐々の、段階的な", "adjective", "Core", "The plants showed gradual growth.", "植物は徐々に成長しました。"],
+  ["immediate", "即座の、直接の", "adjective", "Core", "There was no immediate change in the plant.", "植物にはすぐには変化がありませんでした。"],
+
+  // Challenge transfer: science, environment, history and narrative writing
+  ["biodiversity", "生物多様性", "noun", "Challenge", "The project examined biodiversity in the local park.", "その計画は地域の公園の生物多様性を調べました。"],
+  ["conservation", "自然保護、保存", "noun", "Challenge", "Wildlife conservation requires long-term action.", "野生生物の保護には長期的な行動が必要です。"],
+  ["ecosystem", "生態系", "noun", "Challenge", "Pollution can damage the river ecosystem.", "汚染は川の生態系を損なうことがあります。"],
+  ["habitat", "生息地", "noun", "Challenge", "The forest provides a habitat for many species.", "森林は多くの種に生息地を提供します。"],
+  ["pollution", "汚染", "noun", "Challenge", "The survey measured pollution near the road.", "その調査は道路付近の汚染を測定しました。"],
+  ["renewable", "再生可能な", "adjective", "Challenge", "The school is considering renewable energy.", "学校は再生可能エネルギーを検討しています。"],
+  ["emission", "排出、排出物", "noun", "Challenge", "Public transport can reduce carbon emissions.", "公共交通機関は炭素排出量を減らせます。"],
+  ["resource", "資源", "noun", "Challenge", "Water is a limited natural resource.", "水は限りある天然資源です。"],
+  ["sustainability", "持続可能性", "noun", "Challenge", "The presentation focused on sustainability.", "その発表は持続可能性に焦点を当てました。"],
+  ["preserve", "保護する、保存する", "verb", "Challenge", "The campaign aims to preserve the woodland.", "その活動は森林地帯を保護することを目指します。"],
+  ["endangered", "絶滅の危機にある", "adjective", "Challenge", "The centre protects endangered animals.", "その施設は絶滅危惧動物を保護しています。"],
+  ["species", "種、生物種", "noun", "Challenge", "Several bird species live in the area.", "その地域には数種類の鳥が生息しています。"],
+  ["adaptation", "適応、改変", "noun", "Challenge", "Thick leaves are an adaptation to dry conditions.", "厚い葉は乾燥した環境への適応です。"],
+  ["impact", "影響、衝撃", "noun", "Challenge", "The report evaluates the impact of climate change.", "報告書は気候変動の影響を評価しています。"],
+  ["evidence", "証拠、根拠", "noun", "Challenge", "Use evidence from the text to support your answer.", "本文の根拠を使って解答を支えなさい。"],
+  ["hypothesis", "仮説", "noun", "Challenge", "The results supported the original hypothesis.", "結果は最初の仮説を支持しました。"],
+  ["variable", "変数、変化させる要因", "noun", "Challenge", "Light was the only variable in the experiment.", "光だけがその実験で変えた要因でした。"],
+  ["observation", "観察、観察結果", "noun", "Challenge", "Record each observation in the table.", "それぞれの観察結果を表に記録しなさい。"],
+  ["analysis", "分析", "noun", "Challenge", "Her analysis revealed a clear pattern.", "彼女の分析で明確な傾向が分かりました。"],
+  ["interpret", "解釈する", "verb", "Challenge", "Interpret the graph before writing a conclusion.", "結論を書く前にグラフを解釈しなさい。"],
+  ["conclusion", "結論", "noun", "Challenge", "The evidence led to a different conclusion.", "その証拠から異なる結論に至りました。"],
+  ["reliable", "信頼できる", "adjective", "Challenge", "A larger sample can produce more reliable results.", "より大きな標本は信頼性の高い結果につながります。"],
+  ["significant", "重要な、著しい", "adjective", "Challenge", "There was a significant difference in growth.", "成長には著しい違いがありました。"],
+  ["factor", "要因", "noun", "Challenge", "Soil type was an important factor in plant growth.", "土の種類は植物の成長に重要な要因でした。"],
+  ["manufacture", "製造する／製造", "verb/noun", "Challenge", "Machines made it possible to manufacture goods faster.", "機械によって製品をより速く製造できるようになりました。"],
+  ["machinery", "機械類", "noun", "Challenge", "New machinery changed factory work.", "新しい機械類が工場の仕事を変えました。"],
+  ["invention", "発明", "noun", "Challenge", "The invention transformed transport.", "その発明は交通を大きく変えました。"],
+  ["production", "生産、製造", "noun", "Challenge", "Factory production increased rapidly.", "工場生産は急速に増加しました。"],
+  ["urbanisation", "都市化", "noun", "Challenge", "Industrial growth accelerated urbanisation.", "産業の発展が都市化を加速させました。"],
+  ["agriculture", "農業", "noun", "Challenge", "New machines also changed agriculture.", "新しい機械は農業も変えました。"],
+  ["transportation", "輸送、交通手段", "noun", "Core", "Railways improved transportation between cities.", "鉄道は都市間の輸送を改善しました。"],
+  ["population", "人口", "noun", "Challenge", "The town's population grew rapidly.", "その町の人口は急速に増えました。"],
+  ["development", "発展、開発", "noun", "Challenge", "Industrial development changed daily life.", "産業の発展は日常生活を変えました。"],
+  ["transform", "一変させる", "verb", "Challenge", "Electricity transformed homes and workplaces.", "電気は家庭と職場を一変させました。"],
+  ["mysterious", "不思議な、謎めいた", "adjective", "Challenge", "A mysterious door appeared in the school.", "学校に不思議な扉が現れました。"],
+  ["invisible", "目に見えない", "adjective", "Challenge", "The character suddenly became invisible.", "その登場人物は突然見えなくなりました。"],
+  ["encounter", "遭遇する／出会い", "verb/noun", "Challenge", "She encountered a strange creature beyond the door.", "彼女は扉の向こうで不思議な生き物に遭遇しました。"],
+  ["consequence", "結果、重大な影響", "noun", "Challenge", "Every choice in the story has a consequence.", "物語のどの選択にも結果が伴います。"],
+  ["eventually", "最終的に、やがて", "adverb", "Core", "He eventually found a way back to school.", "彼は最終的に学校へ戻る方法を見つけました。"],
+  ["determine", "特定する、決定する", "verb", "Challenge", "The class tried to determine the cause.", "クラスは原因を特定しようとしました。"],
+  ["demonstrate", "実証する、示す", "verb", "Challenge", "The experiment demonstrated the effect of light.", "その実験は光の影響を実証しました。"],
+  ["evaluate", "評価する", "verb", "Challenge", "Evaluate whether the source is reliable.", "その情報源が信頼できるか評価しなさい。"],
+  ["achievement", "達成、成果", "noun", "Core", "Completing the project was a major achievement.", "計画を完成させたことは大きな成果でした。"],
+  ["exhibition", "展示会、展覧会", "noun", "Core", "The museum exhibition was fascinating.", "博物館の展示会はとても興味深いものでした。"],
+  ["fascinating", "非常に興味深い", "adjective", "Core", "The students found the experiment fascinating.", "生徒たちはその実験を非常に興味深いと感じました。"],
+  ["phenomenon", "現象", "noun", "Challenge", "The class investigated a natural phenomenon.", "クラスは自然現象を調査しました。"],
+  ["interaction", "相互作用、交流", "noun", "Challenge", "The study examined the interaction between light and growth.", "その研究は光と成長の相互作用を調べました。"],
+  ["maintain", "維持する", "verb", "Challenge", "Plants must maintain enough water to survive.", "植物は生き残るために十分な水分を保つ必要があります。"],
+  ["capacity", "能力、容量", "noun", "Challenge", "Clay has a high capacity to retain water.", "粘土は水を保持する能力が高いです。"],
+  ["essential", "不可欠な、本質的な", "adjective", "Challenge", "Light is essential for photosynthesis.", "光は光合成に不可欠です。"],
+  ["indicate", "示す", "verb", "Challenge", "The results indicate that soil type matters.", "結果は土の種類が重要だと示しています。"],
+  ["derive", "引き出す、由来する", "verb", "Challenge", "We can derive a conclusion from the evidence.", "証拠から結論を導けます。"],
+  ["contrast", "対比する／対照", "verb/noun", "Challenge", "Contrast the two experimental conditions.", "2つの実験条件を対比しなさい。"],
 ];
 
 const GENERATED = {
@@ -199,8 +334,10 @@ function sourceExampleFor(lemma, suppliedForms = forms(lemma)) {
 const retained = [...oldByLemma.values()].filter((row) => !EXCLUDE.has(row[1].toLowerCase())).map((row) => {
   const evidence = evidenceFor(row[1]);
   const frequency = evidence.reduce((n, x) => n + x.count, 0);
-  const score = 150 + (row[6] === "Core" ? 25 : 0) + (row[4] === "S" ? 20 : row[4] === "A" ? 12 : 5) + Math.min(frequency, 15) * 3;
-  return { row: [...row.slice(0, 7), ["A", "B"], true, true], evidence, score, origin: "retained" };
+  const key = row[1].toLowerCase();
+  const band = CHALLENGE_KEEP.has(key) ? "Challenge" : FOUNDATION_KEEP.has(key) ? "Foundation" : "Core";
+  const score = 150 + (row[4] === "S" ? 20 : row[4] === "A" ? 12 : 5) + Math.min(frequency, 15) * 3;
+  return { row: [...row.slice(0, 5), "core", band, ["A", "B"], true, true], evidence, score, origin: "retained" };
 });
 
 const additions = waseda.filter((v) => !oldByLemma.has(v.word.toLowerCase()) && !EXCLUDE.has(v.word.toLowerCase())).map((v) => {
@@ -208,30 +345,38 @@ const additions = waseda.filter((v) => !oldByLemma.has(v.word.toLowerCase()) && 
   const frequency = evidence.reduce((n, x) => n + x.count, 0);
   if (!frequency) return null;
   const papers = new Set(evidence.map((x) => `${x.year}-${x.schedule}`)).size;
-  const band = v.level >= 75 ? "Challenge" : v.level >= 70 ? "Core" : (papers >= 2 || frequency >= 3 ? "Core" : "Foundation");
-  const priority = papers >= 2 || frequency >= 5 ? "S" : v.level >= 75 ? "A" : v.priority === "S" ? "A" : "B";
+  const key = v.word.toLowerCase();
+  const band = CHALLENGE_KEEP.has(key) ? "Challenge" : FOUNDATION_KEEP.has(key) ? "Foundation" : "Core";
+  const priority = papers >= 2 || frequency >= 5 ? "S" : v.priority === "S" ? "A" : "B";
   const row = [idFor(v.word, normalizePos(v.pos)), v.word, v.meaning, normalizePos(v.pos), priority, band === "Challenge" ? "challenge" : "core", band, ["A", "B"], true, true];
-  const score = 220 + (v.level - 60) * 4 + papers * 24 + Math.min(frequency, 12) * 4 + (v.studyLayer === "challenge" ? 18 : 0);
+  // Waseda level is a score-target field, so it must never affect lexical band.
+  const score = 220 + papers * 24 + Math.min(frequency, 12) * 4;
   return { row, evidence, score, origin: "waseda-crosscheck" };
 }).filter(Boolean);
 
-const manual = MANUAL.map(([lemma, meaning, pos, band]) => {
+const curated = [...MANUAL, ...TRANSFER].filter(([lemma]) => !EXCLUDE.has(lemma.toLowerCase())).map(([lemma, meaning, pos, band, sentence, ja]) => {
   const evidence = evidenceFor(lemma);
   const frequency = evidence.reduce((n, x) => n + x.count, 0);
   const row = [idFor(lemma, pos), lemma, meaning, pos, frequency >= 2 ? "S" : band === "Challenge" ? "A" : "B", band === "Challenge" ? "challenge" : "core", band, ["A", "B"], true, true];
-  return { row, evidence, score: 390 + frequency * 5, origin: "rikkyo-academic" };
+  const generated = sentence ? { sentence, ja, provenance: "generated-from-rikkyo-patterns" } : null;
+  return { row, evidence, generated, score: 500 + frequency * 5, origin: sentence ? "rikkyo-transfer" : "rikkyo-academic" };
 });
 
 const unique = new Map();
-for (const item of [...retained, ...additions, ...manual].sort((a, b) => b.score - a.score)) {
+for (const item of [...retained, ...additions, ...curated].sort((a, b) => b.score - a.score)) {
   const key = item.row[1].toLowerCase();
   if (!unique.has(key)) unique.set(key, item);
 }
-const selected = [...unique.values()].sort((a, b) => b.score - a.score).slice(0, 241).sort((a, b) => a.row[0].localeCompare(b.row[0]));
+const quotas = { Foundation: 30, Core: 151, Challenge: 60 };
+const selected = Object.entries(quotas).flatMap(([band, count]) => {
+  const rows = [...unique.values()].filter((item) => item.row[6] === band).sort((a, b) => b.score - a.score || a.row[1].localeCompare(b.row[1]));
+  if (rows.length < count) throw new Error(`insufficient ${band}: ${rows.length}/${count}`);
+  return rows.slice(0, count);
+}).sort((a, b) => a.row[0].localeCompare(b.row[0]));
 if (selected.length !== 241) throw new Error(`selected:${selected.length}`);
 if (new Set(selected.map((x) => x.row[0])).size !== 241) throw new Error("duplicate selected stable ID");
 
-const previousRegistry = JSON.parse(fromBaseline("public/data/registry.json"));
+const previousRegistry = JSON.parse(await readFile(new URL("../public/data/registry.json", import.meta.url), "utf8"));
 const registry = [...new Set([...previousRegistry, ...selected.map((x) => x.row[0])])].sort();
 
 function generatedFor(lemma, meaning) {
@@ -249,7 +394,7 @@ const entities = {};
 for (const item of selected) {
   const [stableId, lemma, meaningJa, , priority, studyLayer, targetBand] = item.row;
   const evidence = item.evidence;
-  const generatedExample = generatedFor(lemma, meaningJa);
+  const generatedExample = item.generated ?? generatedFor(lemma, meaningJa);
   const clozeSentence = generatedExample.sentence.replace(matcher([lemma]), "_____");
   entities[stableId] = {
     stableId, lemma, meaningJa, priority, studyLayer, targetBand, schedules: ["A", "B"],
@@ -269,9 +414,9 @@ for (let i = 0; i < 13; i += 1) {
 }
 await writeFile(new URL("../public/data/registry.json", import.meta.url), `${JSON.stringify(registry)}\n`);
 await writeFile(new URL("../public/data/enrichment.json", import.meta.url), `${JSON.stringify({
-  format: "rikkyo-vocab-enrichment/v1", version: "2026-09-17-reselected-v1",
+  format: "rikkyo-vocab-enrichment/v1", version: "2026-09-17-reselected-v2",
   sourceScope: ["FY24-A", "FY24-B", "FY25-A", "FY25-B", "FY26-A", "FY26-B"],
-  generationMethod: "difficulty-aware selection with paper-gloss, boilerplate and elementary-word exclusions; six-paper OCR evidence; original generated practice sentences",
+  generationMethod: "lexical-difficulty selection independent of score bands; sense-aware paper evidence; Rikkyo-theme transfer vocabulary; audio-optional generated practice sentences",
   entityCount: 241,
   sourceMatchedEntityCount: Object.values(entities).filter((x) => x.evidence.length).length,
   generatedFallbackCount: Object.values(entities).filter((x) => x.generatedExample).length,

@@ -30,9 +30,9 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.4.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
-    manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 801, coreEntityCount: 241, generatedFromPhase: 23, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
-    registry: Array.from({ length: 801 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
+    registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
   };
 }
