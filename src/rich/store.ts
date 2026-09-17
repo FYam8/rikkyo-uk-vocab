@@ -43,12 +43,16 @@ interface LegacyWordMemory {
 export async function ensureGeneration(db: IDBDatabase, dataVersion: string, registryCount: number, coreCount: number): Promise<GenerationMeta> {
   const existing = await one<GenerationMeta>(db, "meta", "generation");
   if (existing) {
-    if (existing.persistenceSchemaVersion === PERSISTENCE_SCHEMA_VERSION) return existing;
+    const preferences = await one<Preferences>(db, "meta", "preferences");
+    if (existing.persistenceSchemaVersion === PERSISTENCE_SCHEMA_VERSION && preferences) return existing;
     const upgraded = { ...existing, productVersion: PRODUCT_VERSION, engineVersion: ENGINE_VERSION, persistenceSchemaVersion: PERSISTENCE_SCHEMA_VERSION, createdByRelease: PRODUCT_VERSION };
     const tx = db.transaction(["meta", "events"], "readwrite");
     upgraded.revision += 1;
     tx.objectStore("meta").put(upgraded);
-    tx.objectStore("events").put({ key: `domain:${upgraded.generationId}:${upgraded.revision}`, generationId: upgraded.generationId, revision: upgraded.revision, type: "PersistenceMigrated", at: new Date().toISOString(), payload: { from: existing.persistenceSchemaVersion ?? "pre-v3", to: PERSISTENCE_SCHEMA_VERSION, preservedExistingState: true } } satisfies DomainEvent);
+    if (!preferences) {
+      tx.objectStore("meta").put({ key: "preferences", generationId: upgraded.generationId, dailyTargetSeconds: DAY_TARGET, learningTimeZone: "Europe/London", examDate: null, diagnosticCompleted: false, studyMode: "recommended", sessionSize: 20, scheduleFilter: "all", accent: "auto", voiceURI: "", theme: "auto", audioQuestions: "auto", lastAppliedRevision: upgraded.revision } satisfies Preferences);
+    }
+    tx.objectStore("events").put({ key: `domain:${upgraded.generationId}:${upgraded.revision}`, generationId: upgraded.generationId, revision: upgraded.revision, type: "PersistenceMigrated", at: new Date().toISOString(), payload: { from: existing.persistenceSchemaVersion ?? "pre-v3", to: PERSISTENCE_SCHEMA_VERSION, preservedExistingState: true, preferencesRecovered: !preferences } } satisfies DomainEvent);
     await done(tx);
     return upgraded;
   }
@@ -92,6 +96,19 @@ export async function loadRichState(db: IDBDatabase) {
 
 export async function loadActiveSession(db: IDBDatabase): Promise<StoredSessionRecord | undefined> {
   return one<StoredSessionRecord>(db, "sessions", "active-session");
+}
+
+export async function discardInvalidActiveSession(db: IDBDatabase): Promise<void> {
+  const tx = db.transaction("sessions", "readwrite");
+  tx.objectStore("sessions").delete("active-session");
+  await done(tx);
+}
+
+export async function repairStartupTransientState(db: IDBDatabase): Promise<void> {
+  const tx = db.transaction(["sessions", "coordination"], "readwrite");
+  tx.objectStore("sessions").delete("active-session");
+  tx.objectStore("coordination").delete("writer");
+  await done(tx);
 }
 
 async function liveLease(writer: SingleWriter, tx: IDBTransaction) {

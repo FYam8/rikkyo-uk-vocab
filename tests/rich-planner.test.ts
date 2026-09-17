@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.2", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.3", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,

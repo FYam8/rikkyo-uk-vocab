@@ -19,7 +19,18 @@ function skillsFor(entity: RuntimeEntity): SkillKey[] { return entity.quizEligib
 
 export function ensurePlan(generationId: string, targetSeconds: number, existing?: DailyPlanRecord, timeZone = "Europe/London", now = new Date()): DailyPlanRecord {
   const day = learningDayId(now, timeZone);
-  if (existing?.learningDayId === day && existing.generationId === generationId) return existing;
+  if (existing?.learningDayId === day && existing.generationId === generationId) return {
+    ...existing,
+    targetSeconds: Number.isFinite(existing.targetSeconds) ? existing.targetSeconds : targetSeconds,
+    acquisitionCap: Number.isFinite(existing.acquisitionCap) ? existing.acquisitionCap : 12,
+    newEntityCap: Number.isFinite(existing.newEntityCap) ? existing.newEntityCap : 12,
+    acquisitionBudget: Number.isFinite(existing.acquisitionBudget) ? existing.acquisitionBudget : 12,
+    acquisitionUsed: Number.isFinite(existing.acquisitionUsed) ? existing.acquisitionUsed : 0,
+    introducedStableIds: Array.isArray(existing.introducedStableIds) ? existing.introducedStableIds : [],
+    introducedSkillKeys: Array.isArray(existing.introducedSkillKeys) ? existing.introducedSkillKeys : [],
+    acquisitionClosed: existing.acquisitionClosed === true,
+    activeStudySeconds: Number.isFinite(existing.activeStudySeconds) ? existing.activeStudySeconds : 0,
+  };
   return {
     key: `plan:${generationId}:${day}`,
     generationId,

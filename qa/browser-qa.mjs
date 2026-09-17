@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.2" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.5.3" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -22,6 +22,47 @@ try {
   await legacyPage.goto(legacyUrl.href, { waitUntil: "networkidle" });
   await legacyPage.getByRole("heading", { name: "学習", exact: true }).waitFor();
   await legacyContext.close();
+
+  const repairContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const seedPage = await repairContext.newPage();
+  await seedPage.goto(baseURL, { waitUntil: "networkidle" });
+  await seedPage.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await seedPage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(["meta", "memory", "sessions", "coordination"], "readwrite");
+      const generation = tx.objectStore("meta").get("generation");
+      generation.onsuccess = () => {
+        const generationId = generation.result.generationId;
+        tx.objectStore("meta").delete("preferences");
+        tx.objectStore("memory").put({ key: "skill:qa-preserved:meaningRecognition", stableId: "qa-preserved", skillKey: "meaningRecognition", generationId, stage: "learning", card: null, stepIndex: 0, dueAt: new Date().toISOString(), correct: 2, wrong: 1, lapses: 0, episodeId: "qa", provisionalUntil: null, lastSeenAt: null, lastAppliedRevision: 1 });
+        tx.objectStore("sessions").put({ key: "active-session", generationId, sessionId: "corrupt-session", mode: "study", queue: [{ questionInstanceId: "corrupt-question", stableId: "retired-stable-id", skillKey: "meaningRecognition" }], resumeIndex: 0, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), lastAppliedRevision: 1 });
+        tx.objectStore("coordination").put({ key: "writer", ownerId: "stale-safari-tab", generation: 999, expiresAt: Date.now() + 60_000 });
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await seedPage.close();
+  const repairedPage = await repairContext.newPage();
+  await repairedPage.goto(`${baseURL}?qa=corrupt-startup`, { waitUntil: "networkidle" });
+  await repairedPage.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  const repaired = await repairedPage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const tx = request.result.transaction(["meta", "memory", "sessions"], "readonly");
+      const preferences = tx.objectStore("meta").get("preferences");
+      const memory = tx.objectStore("memory").get("skill:qa-preserved:meaningRecognition");
+      const active = tx.objectStore("sessions").get("active-session");
+      tx.oncomplete = () => resolve({ preferences: preferences.result, memory: memory.result, active: active.result });
+      tx.onerror = () => reject(tx.error);
+    };
+  }));
+  if (!repaired.preferences || repaired.memory?.correct !== 2 || repaired.active) throw new Error("Safari startup repair did not preserve learning history or clear invalid transient state");
+  await repairContext.close();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
@@ -198,7 +239,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.2 stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.5.3 Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

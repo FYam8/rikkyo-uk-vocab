@@ -100,14 +100,18 @@ export class SingleWriter {
   constructor(private readonly db: IDBDatabase, channelName: string = BROADCAST_CHANNEL, ownerId: string = crypto.randomUUID()) {
     this.ownerId = ownerId;
     if (typeof BroadcastChannel !== "undefined") {
-      this.channel = new BroadcastChannel(channelName);
-      this.channel.addEventListener("message", (event: MessageEvent<{ type?: string; ownerId?: string; generation?: number }>) => {
-        const message = event.data;
-        if (message?.type !== "writer-acquired") return;
-        if (message.ownerId === this.ownerId && (message.generation ?? 0) <= this.generation) return;
-        this.stopHeartbeat();
-        this.supersededHandler?.();
-      });
+      try {
+        this.channel = new BroadcastChannel(channelName);
+        this.channel.addEventListener("message", (event: MessageEvent<{ type?: string; ownerId?: string; generation?: number }>) => {
+          const message = event.data;
+          if (message?.type !== "writer-acquired") return;
+          if (message.ownerId === this.ownerId && (message.generation ?? 0) <= this.generation) return;
+          this.stopHeartbeat();
+          this.supersededHandler?.();
+        });
+      } catch {
+        this.channel = null;
+      }
     }
   }
 
@@ -120,8 +124,7 @@ export class SingleWriter {
     const store = tx.objectStore("coordination");
     const current = await get<WriterLease>(store, "writer");
     if (current && current.expiresAt > now && current.ownerId !== this.ownerId) {
-      tx.abort();
-      try { await txDone(tx); } catch { /* expected */ }
+      await txDone(tx);
       return false;
     }
     this.generation = Math.max(this.generation, current?.generation ?? 0) + 1;
@@ -146,8 +149,7 @@ export class SingleWriter {
     const store = tx.objectStore("coordination");
     const current = await get<WriterLease>(store, "writer");
     if (!current || current.ownerId !== this.ownerId || current.generation !== this.generation) {
-      tx.abort();
-      try { await txDone(tx); } catch { /* expected */ }
+      await txDone(tx);
       this.stopHeartbeat();
       this.supersededHandler?.();
       return false;

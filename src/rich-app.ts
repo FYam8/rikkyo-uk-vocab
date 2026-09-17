@@ -4,7 +4,7 @@ import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./run
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
 import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, retryGap, stateKey } from "./rich/planner";
-import { clearActiveSession, commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
+import { clearActiveSession, commitEventOnly, createBackup, discardInvalidActiveSession, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, repairStartupTransientState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
 import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
 import { PRODUCT_VERSION, SCHEDULER_CONFIG } from "./config";
@@ -37,11 +37,15 @@ const graded = new Set<string>();
 const WRITER_OWNER_KEY = "rikkyo-uk-vocab:writer-owner:v3";
 
 function writerOwnerId(): string {
-  const current = sessionStorage.getItem(WRITER_OWNER_KEY);
-  if (current) return current;
-  const created = crypto.randomUUID();
-  sessionStorage.setItem(WRITER_OWNER_KEY, created);
-  return created;
+  try {
+    const current = sessionStorage.getItem(WRITER_OWNER_KEY);
+    if (current) return current;
+    const created = crypto.randomUUID();
+    sessionStorage.setItem(WRITER_OWNER_KEY, created);
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
 }
 
 async function ensureWritable(): Promise<boolean> {
@@ -444,6 +448,17 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
   if (!ctx?.writable) return;
   const stored = await loadActiveSession(ctx.db);
   if (!stored) return;
+  const validModes = new Set(["study", "diagnostic"]);
+  const validSkills = new Set(["meaningRecognition", "formProduction"]);
+  const currentIds = new Set(ctx.bundle.core.map((item) => item.stableId));
+  const queueIsValid = Array.isArray(stored.queue) && stored.queue.length > 0 && stored.queue.every((question) =>
+    question && typeof question.questionInstanceId === "string" && currentIds.has(question.stableId) && validSkills.has(question.skillKey),
+  );
+  if (!validModes.has(stored.mode) || !queueIsValid || !Number.isInteger(stored.resumeIndex) || stored.resumeIndex < 0) {
+    await discardInvalidActiveSession(ctx.db);
+    location.hash = "home";
+    return;
+  }
   if (stored.generationId !== generationId) {
     await clearActiveSession(ctx.db, ctx.writer, "stale-generation");
     return;
@@ -486,7 +501,11 @@ async function boot() {
     if (!ctx || ctx.writer !== writer) return;
     ctx.writable = false;
   });
-  const writable = await writer.acquire();
+  let writable = await writer.acquire();
+  if (!writable && document.visibilityState === "visible") {
+    await writer.takeOver();
+    writable = true;
+  }
   if (writable) writer.startHeartbeat();
   const generation = await ensureGeneration(db, bundle.manifest.dataVersion, bundle.registry.length, bundle.core.length);
   ctx = { bundle, db, writer, writable };
@@ -496,14 +515,43 @@ async function boot() {
     if (typeof q === "string") graded.add(q);
   }
   activePreferences = s.preferences ?? null;
-  await recoverSession(s.events, generation.generationId, s.preferences!);
+  if (!s.preferences) throw new Error("PREFERENCES_RECOVERY_FAILED");
+  await recoverSession(s.events, generation.generationId, s.preferences);
   window.addEventListener("hashchange", () => void renderRoute());
   window.addEventListener("pagehide", () => { writer.close(); db.close(); }, { once: true });
   if ("serviceWorker" in navigator && import.meta.env.PROD) navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(console.error);
   await renderRoute();
 }
+async function repairAndReload() {
+  try {
+    ctx?.writer.close();
+    ctx?.db.close();
+    ctx = null;
+    const db = await openStudyDb();
+    await repairStartupTransientState(db);
+    db.close();
+    const url = new URL(location.href);
+    url.searchParams.set("startupRepair", PRODUCT_VERSION);
+    location.replace(url);
+  } catch (error) {
+    console.error("Startup repair failed", error);
+    location.reload();
+  }
+}
+
 void boot().catch((error) => {
   console.error("Application startup failed", error);
-  root.innerHTML = `<main class="hero"><h1>画面を更新しています</h1><p>公開データの更新に失敗しました。学習履歴は消去されていません。</p><button class="primary" id="retry-startup">再読み込み</button></main>`;
-  document.querySelector("#retry-startup")?.addEventListener("click", () => location.reload());
+  const alreadyRepaired = new URL(location.href).searchParams.get("startupRepair") === PRODUCT_VERSION;
+  if (!alreadyRepaired) {
+    root.innerHTML = `<main class="hero"><h1>一時状態を修復しています</h1><p>学習履歴を保持したまま再起動します。</p></main>`;
+    void repairAndReload();
+    return;
+  }
+  root.innerHTML = `<main class="hero"><h1>起動できませんでした</h1><p>学習履歴は消去されていません。端末内の一時状態を安全に修復して再起動できます。</p><button class="primary" id="retry-startup">安全に修復して再起動</button></main>`;
+  document.querySelector("#retry-startup")?.addEventListener("click", () => {
+    const url = new URL(location.href);
+    url.searchParams.delete("startupRepair");
+    history.replaceState(null, "", url);
+    void repairAndReload();
+  });
 });
