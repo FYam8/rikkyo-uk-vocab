@@ -16,7 +16,7 @@ describe("runtime data gate", () => {
     const fetchMock = vi.fn().mockResolvedValue(current);
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchReleaseAsset("/rikkyo-uk-vocab/", "data/manifest.json")).resolves.toBe(current);
-    expect(fetchMock).toHaveBeenCalledWith("/rikkyo-uk-vocab/data/manifest.json?appRelease=3.5.4", { cache: "no-store" });
+    expect(fetchMock).toHaveBeenCalledWith("/rikkyo-uk-vocab/data/manifest.json?appRelease=3.5.5", { cache: "no-store" });
   });
 
   it("falls back to the unversioned service-worker cache when offline", async () => {

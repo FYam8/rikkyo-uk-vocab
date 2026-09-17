@@ -22,7 +22,31 @@ const EXCLUDE = new Set([
   "angry", "at first", "be afraid of", "catch a cold", "come from", "for example",
   "help with", "in the past", "sick", "size",
 ]);
-const SOURCE_EXAMPLE_EXCLUDE = new Set(["allow", "catch", "choose", "close", "follow", "for example", "in order to", "miss", "sometimes", "source"]);
+const SOURCE_EXAMPLE_EXCLUDE = new Set([
+  "allow", "catch", "choose", "close", "energy", "follow", "for example",
+  "in order to", "leave", "miss", "order", "sometimes", "source", "support", "up to",
+]);
+
+// OCR can join headings, adjacent dialogue, and answer choices to otherwise
+// valid sentences. Keep the authentic wording while presenting one complete,
+// learner-facing sentence from the cited page.
+const SOURCE_SENTENCE_OVERRIDES = {
+  ability: "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+  believe: "But you did not believe me.",
+  creative: "Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
+  deliver: "Next morning Helen saw John delivering letters to her neighbours.",
+  discover: "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+  "even if": "Even if I repair it, I can't use it.",
+  hope: "Our only hope is to play dead when that hunter comes back tomorrow.",
+  imagine: "Imagine that one morning you find a mysterious door in your school that you've never seen before.",
+  invisible: "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+  join: "Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
+  mysterious: "Imagine that one morning you find a mysterious door in your school that you've never seen before.",
+  power: "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+  since: "I have wanted to have a dog since I was a little girl.",
+  though: "Though she was not sure, she followed her mother's instructions and planted the stem in the garden and then watered it.",
+  usually: "Usually, most female robins fly to warm countries before winter.",
+};
 
 const MANUAL = [
   ["photosynthesis", "光合成", "noun", "Challenge"],
@@ -194,6 +218,14 @@ const TRANSFER = [
 ];
 
 const GENERATED = {
+  condition: ["The machine works well under this condition.", "その機械はこの条件下で正常に動きます。"],
+  energy: ["Solar panels turn sunlight into energy.", "太陽光パネルは日光をエネルギーに変えます。"],
+  "even though": ["Even though he was tired, he continued working.", "彼は疲れていたにもかかわらず、作業を続けました。"],
+  insect: ["The researchers found the substance in an insect.", "研究者たちは昆虫の中からその物質を発見しました。"],
+  "make sure": ["Make sure you check the final choice.", "最後の選択肢を必ず確認してください。"],
+  order: ["Please put the events in the correct order.", "出来事を正しい順序に並べてください。"],
+  instead: ["The bus was full, so we walked instead.", "バスが満員だったので、代わりに歩きました。"],
+  "up to": ["You can choose up to three activities.", "活動は最大3つまで選べます。"],
   surprise: ["To everyone's surprise, the smallest plant grew the fastest.", "みんなが驚いたことに、いちばん小さな植物が最も速く育ちました。"],
   invite: ["The science club will invite a local researcher to speak.", "科学部は地域の研究者を講演に招きます。"],
   difference: ["The experiment showed a clear difference between the two samples.", "実験は2つの試料の明確な違いを示しました。"],
@@ -355,6 +387,12 @@ function sourceExampleFor(lemma, suppliedForms = forms(lemma)) {
     }
   }
   if (!best) return null;
+  const override = SOURCE_SENTENCE_OVERRIDES[lemma.toLowerCase()];
+  if (override) {
+    const hit = override.match(matcher(suppliedForms));
+    if (!hit) throw new Error(`source override does not contain ${lemma}`);
+    best = { ...best, sentence: override, matchedForm: hit[0] };
+  }
   const { score: _score, ...example } = best;
   return example;
 }
@@ -417,6 +455,10 @@ function generatedFor(lemma, meaning) {
   };
   return null;
 }
+function replaceFirst(text, list) {
+  const pattern = matcher(list);
+  return text.replace(new RegExp(pattern.source, "i"), "_____");
+}
 const entities = {};
 for (const item of selected) {
   const [stableId, lemma, meaningJa, , priority, studyLayer, targetBand] = item.row;
@@ -424,9 +466,9 @@ for (const item of selected) {
   const sourceExample = sourceExampleFor(lemma);
   const generatedExample = item.generated ?? generatedFor(lemma, meaningJa);
   const sourceCloze = sourceExample?.matchedForm.toLowerCase() === lemma.toLowerCase()
-    ? sourceExample.sentence.replace(matcher([sourceExample.matchedForm]), "_____")
+    ? replaceFirst(sourceExample.sentence, [sourceExample.matchedForm])
     : "";
-  const generatedCloze = generatedExample?.sentence.replace(matcher([lemma]), "_____") ?? "";
+  const generatedCloze = generatedExample ? replaceFirst(generatedExample.sentence, [lemma]) : "";
   const clozeSentence = sourceCloze.includes("_____") ? sourceCloze : generatedCloze;
   entities[stableId] = {
     stableId, lemma, meaningJa, priority, studyLayer, targetBand, schedules: ["A", "B"],
@@ -446,7 +488,7 @@ for (let i = 0; i < 13; i += 1) {
 }
 await writeFile(new URL("../public/data/registry.json", import.meta.url), `${JSON.stringify(registry)}\n`);
 await writeFile(new URL("../public/data/enrichment.json", import.meta.url), `${JSON.stringify({
-  format: "rikkyo-vocab-enrichment/v1", version: "2026-09-17-reselected-v3",
+  format: "rikkyo-vocab-enrichment/v1", version: "2026-09-17-reselected-v4",
   sourceScope: ["FY24-A", "FY24-B", "FY25-A", "FY25-B", "FY26-A", "FY26-B"],
   generationMethod: "lexical-difficulty selection independent of score bands; sense-aware paper evidence; Rikkyo-theme transfer vocabulary; audio-optional generated practice sentences",
   entityCount: 241,

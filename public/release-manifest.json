@@ -1,11 +1,11 @@
 {
   "appId": "rikkyo-uk-vocab",
-  "productVersion": "3.5.4",
+  "productVersion": "3.5.5",
   "engineVersion": "common-vocab-engine/1.0.0",
   "datasetVersion": "0.24.0-lexical",
   "persistenceSchemaVersion": 3,
   "exportFormatVersion": 3,
   "indexedDbVersion": 3,
   "commonEngineCommit": "3e6fcb1701e721ccaf070df915446004f7f312ef",
-  "enrichmentVersion": "2026-09-17-reselected-v3"
+  "enrichmentVersion": "2026-09-17-reselected-v4"
 }

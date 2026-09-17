@@ -26,6 +26,7 @@ describe("FY24-FY26 A/B enrichment contract", () => {
   it("only emits usable cloze prompts", () => {
     for (const item of Object.values(enrichment.entities) as any[]) if (item.cloze) {
       expect(item.cloze.sentence).toContain("_____");
+      expect(item.cloze.sentence.match(/_____/g)).toHaveLength(1);
       expect(item.cloze.sentence).not.toContain("The passage uses");
       if (item.cloze.provenance === "past-paper-derived") {
         expect(item.sourceExample).toBeTruthy();
@@ -39,6 +40,27 @@ describe("FY24-FY26 A/B enrichment contract", () => {
       expect(item.generatedExample?.sentence ?? "").not.toContain("The passage uses");
       expect(item.cloze?.sentence ?? "").not.toContain("important context");
     }
+  });
+
+  it("rejects OCR boundary and sense-mismatch examples", () => {
+    const byLemma = new Map((Object.values(enrichment.entities) as any[]).map((item) => [item.lemma, item]));
+    for (const lemma of ["energy", "leave", "order", "support", "up to"]) {
+      expect(byLemma.get(lemma)?.sourceExample).toBeNull();
+      expect(byLemma.get(lemma)?.cloze?.provenance).toBe("generated-from-rikkyo-patterns");
+    }
+    for (const item of Object.values(enrichment.entities) as any[]) {
+      expect(item.sourceExample?.sentence ?? "").not.toMatch(/Writing Test|\( B-[1-4] \)|Tomorrow Saturday/);
+      expect(item.cloze?.sentence ?? "").not.toMatch(/Writing Test|\( B-[1-4] \)|Tomorrow Saturday/);
+    }
+  });
+
+  it("keeps generated practice sentences grammatical and presentation-ready", () => {
+    const byLemma = new Map((Object.values(enrichment.entities) as any[]).map((item) => [item.lemma, item]));
+    expect(byLemma.get("condition")?.generatedExample?.sentence).toBe("The machine works well under this condition.");
+    expect(byLemma.get("insect")?.generatedExample?.sentence).toBe("The researchers found the substance in an insect.");
+    expect(byLemma.get("even though")?.generatedExample?.sentence).toMatch(/^Even though/);
+    expect(byLemma.get("make sure")?.generatedExample?.sentence).toMatch(/^Make sure/);
+    expect(byLemma.get("instead")?.generatedExample?.sentence).not.toContain(" .");
   });
 
   it("uses unique lemmas and an entrance-exam difficulty distribution", () => {

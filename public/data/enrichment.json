@@ -1,6 +1,6 @@
 {
   "format": "rikkyo-vocab-enrichment/v1",
-  "version": "2026-09-17-reselected-v3",
+  "version": "2026-09-17-reselected-v4",
   "sourceScope": [
     "FY24-A",
     "FY24-B",
@@ -12,7 +12,7 @@
   "generationMethod": "lexical-difficulty selection independent of score bands; sense-aware paper evidence; Rikkyo-theme transfer vocabulary; audio-optional generated practice sentences",
   "entityCount": 241,
   "sourceMatchedEntityCount": 132,
-  "generatedFallbackCount": 208,
+  "generatedFallbackCount": 211,
   "entities": {
     "rik-p-45be4b2b9a": {
       "stableId": "rik-p-45be4b2b9a",
@@ -54,8 +54,8 @@
       ],
       "sourceExample": null,
       "generatedExample": {
-        "sentence": "make sure you check the final choice.",
-        "ja": "「必ず〜する、確かめる」の使い方を文脈で確認する例文です。",
+        "sentence": "Make sure you check the final choice.",
+        "ja": "最後の選択肢を必ず確認してください。",
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
@@ -237,7 +237,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Even if I repair it, I can't use it.\" Then Tom said to Joe, \"Look outside, Joe.",
+        "sentence": "Even if I repair it, I can't use it.",
         "matchedForm": "Even if",
         "year": 2026,
         "schedule": "B",
@@ -249,7 +249,7 @@
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "_____ I repair it, I can't use it.\" Then Tom said to Joe, \"Look outside, Joe.",
+        "sentence": "_____ I repair it, I can't use it.",
         "answer": "even if",
         "provenance": "past-paper-derived"
       },
@@ -285,18 +285,16 @@
           "category": "reading-language"
         }
       ],
-      "sourceExample": {
-        "sentence": "The owls could fly up to live safely in their cedar tree, once again.",
-        "matchedForm": "up to",
-        "year": 2025,
-        "schedule": "B",
-        "page": 5
+      "sourceExample": null,
+      "generatedExample": {
+        "sentence": "You can choose up to three activities.",
+        "ja": "活動は最大3つまで選べます。",
+        "provenance": "generated-from-rikkyo-patterns"
       },
-      "generatedExample": null,
       "cloze": {
-        "sentence": "The owls could fly _____ live safely in their cedar tree, once again.",
+        "sentence": "You can choose _____ three activities.",
         "answer": "up to",
-        "provenance": "past-paper-derived"
+        "provenance": "generated-from-rikkyo-patterns"
       },
       "selectionOrigin": "waseda-crosscheck"
     },
@@ -332,8 +330,8 @@
       ],
       "sourceExample": null,
       "generatedExample": {
-        "sentence": "even though he was tired, he continued working.",
-        "ja": "「〜にもかかわらず」の使い方を文脈で確認する例文です。",
+        "sentence": "Even though he was tired, he continued working.",
+        "ja": "彼は疲れていたにもかかわらず、作業を続けました。",
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
@@ -625,8 +623,8 @@
         "page": 8
       },
       "generatedExample": {
-        "sentence": "The bus was full, so we walked instead .",
-        "ja": "「その代わりに」の使い方を文脈で確認する例文です。",
+        "sentence": "The bus was full, so we walked instead.",
+        "ja": "バスが満員だったので、代わりに歩きました。",
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
@@ -915,7 +913,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Writing Test Imagine that one morning you find a mysterious door in your school that you've never seen before.",
+        "sentence": "Imagine that one morning you find a mysterious door in your school that you've never seen before.",
         "matchedForm": "mysterious",
         "year": 2026,
         "schedule": "B",
@@ -927,7 +925,7 @@
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "Writing Test Imagine that one morning you find a _____ door in your school that you've never seen before.",
+        "sentence": "Imagine that one morning you find a _____ door in your school that you've never seen before.",
         "answer": "mysterious",
         "provenance": "past-paper-derived"
       },
@@ -1021,18 +1019,16 @@
           "category": "reading-language"
         }
       ],
-      "sourceExample": {
-        "sentence": "Because the hunter came to the vine in order to find the nests.",
-        "matchedForm": "order",
-        "year": 2025,
-        "schedule": "B",
-        "page": 6
+      "sourceExample": null,
+      "generatedExample": {
+        "sentence": "Please put the events in the correct order.",
+        "ja": "出来事を正しい順序に並べてください。",
+        "provenance": "generated-from-rikkyo-patterns"
       },
-      "generatedExample": null,
       "cloze": {
-        "sentence": "Because the hunter came to the vine in _____ to find the nests.",
+        "sentence": "Please put the events in the correct _____.",
         "answer": "order",
-        "provenance": "past-paper-derived"
+        "provenance": "generated-from-rikkyo-patterns"
       },
       "selectionOrigin": "waseda-crosscheck"
     },
@@ -1326,7 +1322,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Writing Test Imagine that one morning you find a mysterious door in your school that you've never seen before.",
+        "sentence": "Imagine that one morning you find a mysterious door in your school that you've never seen before.",
         "matchedForm": "Imagine",
         "year": 2026,
         "schedule": "B",
@@ -1334,7 +1330,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "Writing Test _____ that one morning you find a mysterious door in your school that you've never seen before.",
+        "sentence": "_____ that one morning you find a mysterious door in your school that you've never seen before.",
         "answer": "imagine",
         "provenance": "past-paper-derived"
       },
@@ -1727,7 +1723,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Librarians Creative Writing Workshop Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
+        "sentence": "Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
         "matchedForm": "Join",
         "year": 2026,
         "schedule": "B",
@@ -1735,7 +1731,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "Librarians Creative Writing Workshop _____ us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
+        "sentence": "_____ us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
         "answer": "join",
         "provenance": "past-paper-derived"
       },
@@ -2067,7 +2063,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+        "sentence": "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
         "matchedForm": "power",
         "year": 2026,
         "schedule": "A",
@@ -2079,7 +2075,7 @@
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another _____).",
+        "sentence": "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another _____).",
         "answer": "power",
         "provenance": "past-paper-derived"
       },
@@ -2370,7 +2366,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "It may grow.\" Though she was not sure, she followed her mother's instructions and planted the stem in the garden and then watered it.",
+        "sentence": "Though she was not sure, she followed her mother's instructions and planted the stem in the garden and then watered it.",
         "matchedForm": "Though",
         "year": 2026,
         "schedule": "A",
@@ -2378,7 +2374,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "It may grow.\" _____ she was not sure, she followed her mother's instructions and planted the stem in the garden and then watered it.",
+        "sentence": "_____ she was not sure, she followed her mother's instructions and planted the stem in the garden and then watered it.",
         "answer": "though",
         "provenance": "past-paper-derived"
       },
@@ -2964,7 +2960,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "But you did not believe me.\" \"What should we do now?\" cried another owl.",
+        "sentence": "But you did not believe me.",
         "matchedForm": "believe",
         "year": 2025,
         "schedule": "B",
@@ -2972,7 +2968,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "But you did not _____ me.\" \"What should we do now?\" cried another owl.",
+        "sentence": "But you did not _____ me.",
         "answer": "believe",
         "provenance": "past-paper-derived"
       },
@@ -3186,12 +3182,12 @@
       ],
       "sourceExample": null,
       "generatedExample": {
-        "sentence": "They searched for useful substances in water and insect.",
-        "ja": "「昆虫」の使い方を文脈で確認する例文です。",
+        "sentence": "The researchers found the substance in an insect.",
+        "ja": "研究者たちは昆虫の中からその物質を発見しました。",
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "They searched for useful substances in water and _____.",
+        "sentence": "The researchers found the substance in an _____.",
         "answer": "insect",
         "provenance": "generated-from-rikkyo-patterns"
       },
@@ -3301,13 +3297,7 @@
           "category": "reading-language"
         }
       ],
-      "sourceExample": {
-        "sentence": "It was getting colder and colder and leaves started to fall.",
-        "matchedForm": "leaves",
-        "year": 2025,
-        "schedule": "A",
-        "page": 5
-      },
+      "sourceExample": null,
       "generatedExample": {
         "sentence": "We have to leave home by seven.",
         "ja": "「去る、出発する／残す」の使い方を文脈で確認する例文です。",
@@ -4016,7 +4006,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+        "sentence": "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
         "matchedForm": "discover",
         "year": 2026,
         "schedule": "A",
@@ -4028,7 +4018,7 @@
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "Writing Test One morning you wake up and _____ that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+        "sentence": "One morning you wake up and _____ that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
         "answer": "discover",
         "provenance": "past-paper-derived"
       },
@@ -4790,7 +4780,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "I have wanted to have a dog since I was a little girl, Can I have one?",
+        "sentence": "I have wanted to have a dog since I was a little girl.",
         "matchedForm": "since",
         "year": 2026,
         "schedule": "A",
@@ -4798,7 +4788,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "I have wanted to have a dog _____ I was a little girl, Can I have one?",
+        "sentence": "I have wanted to have a dog _____ I was a little girl.",
         "answer": "since",
         "provenance": "past-paper-derived"
       },
@@ -5195,7 +5185,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "It visits my garden every day.\" Emma said, \"( B-1 ) How about asking John, a postman, tomorrow morning?\" Helen said, \"( B-2 ) Thanks.\" Next morning Helen saw John delivering letters to her neighbours.",
+        "sentence": "Next morning Helen saw John delivering letters to her neighbours.",
         "matchedForm": "delivering",
         "year": 2024,
         "schedule": "B",
@@ -5584,15 +5574,15 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Librarians Creative Writing Workshop Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
-        "matchedForm": "Creative",
+        "sentence": "Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on creative writing.",
+        "matchedForm": "creative",
         "year": 2026,
         "schedule": "B",
         "page": 8
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "Librarians _____ Writing Workshop Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on _____ writing.",
+        "sentence": "Join us on Saturday from 9:00am to 12 noon in Room 5 for a workshop on _____ writing.",
         "answer": "creative",
         "provenance": "past-paper-derived"
       },
@@ -6452,7 +6442,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "\"Our only hope is to play dead when that hunter comes back tomorrow.",
+        "sentence": "Our only hope is to play dead when that hunter comes back tomorrow.",
         "matchedForm": "hope",
         "year": 2025,
         "schedule": "B",
@@ -6460,7 +6450,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "\"Our only _____ is to play dead when that hunter comes back tomorrow.",
+        "sentence": "Our only _____ is to play dead when that hunter comes back tomorrow.",
         "answer": "hope",
         "provenance": "past-paper-derived"
       },
@@ -6554,22 +6544,16 @@
           "category": "academic-practical"
         }
       ],
-      "sourceExample": {
-        "sentence": "Tomorrow Saturday Support Club Come to the library between 10am and 1pm for quiet study and free tutoring.",
-        "matchedForm": "Support",
-        "year": 2026,
-        "schedule": "A",
-        "page": 8
-      },
+      "sourceExample": null,
       "generatedExample": {
         "sentence": "The evidence does not support that conclusion.",
         "ja": "「支える、支持する／支援」の使い方を文脈で確認する例文です。",
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "Tomorrow Saturday _____ Club Come to the library between 10am and 1pm for quiet study and free tutoring.",
+        "sentence": "The evidence does not _____ that conclusion.",
         "answer": "support",
-        "provenance": "past-paper-derived"
+        "provenance": "generated-from-rikkyo-patterns"
       },
       "selectionOrigin": "waseda-crosscheck"
     },
@@ -7771,7 +7755,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+        "sentence": "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
         "matchedForm": "ability",
         "year": 2026,
         "schedule": "A",
@@ -7783,7 +7767,7 @@
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new _____ (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+        "sentence": "One morning you wake up and discover that you have a new _____ (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
         "answer": "ability",
         "provenance": "past-paper-derived"
       },
@@ -8052,12 +8036,12 @@
         "page": 9
       },
       "generatedExample": {
-        "sentence": "The machine works well under these condition.",
-        "ja": "「状態、条件」の使い方を文脈で確認する例文です。",
+        "sentence": "The machine works well under this condition.",
+        "ja": "その機械はこの条件下で正常に動きます。",
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "The machine works well under these _____.",
+        "sentence": "The machine works well under this _____.",
         "answer": "condition",
         "provenance": "generated-from-rikkyo-patterns"
       },
@@ -9031,18 +9015,16 @@
           "category": "academic-practical"
         }
       ],
-      "sourceExample": {
-        "sentence": "Energy sources Read the short text below and answer the questions that follow.",
-        "matchedForm": "Energy",
-        "year": 2026,
-        "schedule": "B",
-        "page": 9
+      "sourceExample": null,
+      "generatedExample": {
+        "sentence": "Solar panels turn sunlight into energy.",
+        "ja": "太陽光パネルは日光をエネルギーに変えます。",
+        "provenance": "generated-from-rikkyo-patterns"
       },
-      "generatedExample": null,
       "cloze": {
-        "sentence": "_____ sources Read the short text below and answer the questions that follow.",
+        "sentence": "Solar panels turn sunlight into _____.",
         "answer": "energy",
-        "provenance": "past-paper-derived"
+        "provenance": "generated-from-rikkyo-patterns"
       },
       "selectionOrigin": "waseda-crosscheck"
     },
@@ -9106,7 +9088,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
+        "sentence": "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become invisible, or another power).",
         "matchedForm": "invisible",
         "year": 2026,
         "schedule": "A",
@@ -9118,7 +9100,7 @@
         "provenance": "generated-from-rikkyo-patterns"
       },
       "cloze": {
-        "sentence": "Writing Test One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become _____, or another power).",
+        "sentence": "One morning you wake up and discover that you have a new ability (for example: you can fly, you can speak to animals, you can become _____, or another power).",
         "answer": "invisible",
         "provenance": "past-paper-derived"
       },
@@ -9599,7 +9581,7 @@
         }
       ],
       "sourceExample": {
-        "sentence": "Usually most female robins fly to warm countries before winter and Daisy (6) did it, too.",
+        "sentence": "Usually, most female robins fly to warm countries before winter.",
         "matchedForm": "Usually",
         "year": 2025,
         "schedule": "A",
@@ -9607,7 +9589,7 @@
       },
       "generatedExample": null,
       "cloze": {
-        "sentence": "_____ most female robins fly to warm countries before winter and Daisy (6) did it, too.",
+        "sentence": "_____, most female robins fly to warm countries before winter.",
         "answer": "usually",
         "provenance": "past-paper-derived"
       },
