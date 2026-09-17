@@ -6,7 +6,7 @@ import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
 import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, ScheduleFilter, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
-import { analysisView, homeView, questionView, settingsView, statsView, wordsView, type Route } from "./rich/views";
+import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
 import { PRODUCT_VERSION, SCHEDULER_CONFIG } from "./config";
 import type { CanonicalReviewPayload } from "./rich/types";
 
@@ -22,6 +22,11 @@ interface Session {
   feedback?: { rating: string; answer: string; given: string };
   shownAt: number;
   diagnostics: Array<{ correct: boolean }>;
+  baseTotal: number;
+  correct: number;
+  wrong: number;
+  retryAnswered: number;
+  missedStableIds: Set<string>;
 }
 let ctx: Ctx | null = null;
 let session: Session | null = null;
@@ -115,6 +120,11 @@ function activeSessionRecord(resumeIndex: number): Omit<StoredSessionRecord, "la
     resumeIndex,
     startedAt: session.startedAt,
     updatedAt: new Date().toISOString(),
+    baseTotal: session.baseTotal,
+    correct: session.correct,
+    wrong: session.wrong,
+    retryAnswered: session.retryAnswered,
+    missedStableIds: [...session.missedStableIds],
   };
 }
 async function checkpointSession(resumeIndex: number, eventType = "SessionCheckpointed") {
@@ -178,7 +188,7 @@ async function startStudy() {
   const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), requested === 0 ? 60 : requested, { mode: s.preferences.studyMode ?? "recommended", schedule: s.preferences.scheduleFilter ?? "all" });
   if (!items.length) return alert("現在出題できる項目はありません。");
   const now = new Date().toISOString();
-  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x)), index: 0, shownAt: Date.now(), diagnostics: [] };
+  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x)), index: 0, shownAt: Date.now(), diagnostics: [], baseTotal: items.length, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: new Set() };
   await checkpointSession(0, "SessionStarted");
   location.hash = "study";
   await renderQuestion();
@@ -188,7 +198,7 @@ async function startDiagnostic() {
   const s = await state();
   const questions = buildDiagnostic(ctx.bundle);
   const now = new Date().toISOString();
-  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "diagnostic", queue: questions, index: 0, shownAt: Date.now(), diagnostics: [] };
+  session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "diagnostic", queue: questions, index: 0, shownAt: Date.now(), diagnostics: [], baseTotal: questions.length, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: new Set() };
   await checkpointSession(0, "SessionStarted");
   location.hash = "diagnostic";
   await renderQuestion();
@@ -197,14 +207,17 @@ async function renderQuestion() {
   if (!ctx || !session) return;
   if (session.index >= session.queue.length) {
     if (session.mode === "diagnostic") await finishDiagnostic();
+    const completed = session;
     await clearActiveSession(ctx.db, ctx.writer, "completed");
     session = null;
-    location.hash = "home";
-    return renderHome();
+    root.innerHTML = sessionResultView({ mode: completed.mode, baseTotal: completed.baseTotal, correct: completed.correct, wrong: completed.wrong, retryAnswered: completed.retryAnswered, missed: [...completed.missedStableIds].map((id) => entity(id)) });
+    document.querySelector("#result-home")?.addEventListener("click", () => { location.hash = "home"; });
+    document.querySelector("#result-retry")?.addEventListener("click", () => void startStudy());
+    return;
   }
   const q = session.queue[session.index]!;
   const e = entity(q.stableId);
-  root.innerHTML = questionView(q, e, session.index, session.queue.length, session.mode, session.feedback);
+  root.innerHTML = questionView(q, e, session.index, session.queue.length, session.mode, { correct: session.correct, wrong: session.wrong, baseTotal: session.baseTotal }, session.feedback);
   document.querySelector("#speak-word")?.addEventListener("click", () => speak(e.lemma));
   document.querySelector("#stop-session")?.addEventListener("click", () => void (async () => {
     if (!ctx) return;
@@ -280,6 +293,16 @@ async function answer(given: string) {
     if ((plan.activeStudySeconds ?? 0) >= plan.targetSeconds) plan.acquisitionClosed = true;
     await savePlan(ctx.db, ctx.writer, plan);
   }
+  if (correct) session.correct += 1;
+  else {
+    session.wrong += 1;
+    session.missedStableIds.add(q.stableId);
+    if (session.mode === "study" && !q.isRetry) {
+      const retry: QuestionRun = { ...q, questionInstanceId: crypto.randomUUID(), isRetry: true, retryOf: q.questionInstanceId };
+      session.queue.splice(Math.min(session.index + 4, session.queue.length), 0, retry);
+    }
+  }
+  if (q.isRetry) session.retryAnswered += 1;
   await checkpointSession(session.index + 1);
   session.feedback = { rating, answer: q.answer, given };
   await renderQuestion();
@@ -305,6 +328,7 @@ function datasetIdentity() {
 }
 function bindSettings() {
   if (!ctx) return;
+  document.querySelector("#voice-test")?.addEventListener("click", () => speak("vocabulary"));
   document.querySelector("#settings-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const min = Number(document.querySelector<HTMLInputElement>("#daily-target")?.value ?? 20);
@@ -398,6 +422,11 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     index: resumeIndex,
     shownAt: Date.now(),
     diagnostics: diagnosticEvents.map((e) => ({ correct: e.payload.correct === true })),
+    baseTotal: stored.baseTotal ?? stored.queue.filter((q) => !q.isRetry).length,
+    correct: stored.correct ?? 0,
+    wrong: stored.wrong ?? 0,
+    retryAnswered: stored.retryAnswered ?? 0,
+    missedStableIds: new Set(stored.missedStableIds ?? []),
   };
   location.hash = stored.mode;
   await checkpointSession(resumeIndex, "SessionResumed");

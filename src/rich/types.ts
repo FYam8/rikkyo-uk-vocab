@@ -121,6 +121,8 @@ export interface QuestionRun {
   kind?: QuestionKind;
   context?: string;
   sourceLabel?: string;
+  isRetry?: boolean;
+  retryOf?: string;
 }
 
 export interface StoredSessionRecord {
@@ -132,6 +134,11 @@ export interface StoredSessionRecord {
   resumeIndex: number;
   startedAt: string;
   updatedAt: string;
+  baseTotal?: number;
+  correct?: number;
+  wrong?: number;
+  retryAnswered?: number;
+  missedStableIds?: string[];
   lastAppliedRevision: number;
 }
 
