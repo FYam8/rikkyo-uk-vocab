@@ -96,7 +96,9 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
 
     for (const entity of candidates) {
       if (items.length >= limit || remainingBudget <= 0) break;
-      const orderedSkills = mode === "exam" ? [...skillsFor(entity)].reverse() : skillsFor(entity);
+      // Waseda-parity progression: every unseen entity starts with objective
+      // English -> Japanese recognition before production is introduced.
+      const orderedSkills = skillsFor(entity);
       const skillKey = orderedSkills.find((s) => {
         const existing = byKey.get(stateKey(entity.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";
@@ -177,17 +179,18 @@ function questionKind(item: PlannedItem, options: QuestionOptions): QuestionKind
   const allowAudio = options.allowAudio !== false;
   const strength = Math.max(0, (item.state?.correct ?? 0) - (item.state?.wrong ?? 0));
   const roll = stableNumber(`${item.entity.stableId}:${item.skillKey}:${item.state?.correct ?? 0}:${item.state?.wrong ?? 0}`) % 100;
+  // New material is always introduced objectively. Recognition comes first in
+  // buildQueue; production then starts with Japanese -> English four-choice.
+  if (item.lane === "acquisition") return item.skillKey === "meaningRecognition" ? "meaningChoice" : "reverseChoice";
   if (options.intensity === "exam") {
     if (item.skillKey === "formProduction") return item.entity.cloze && roll < 60 ? "clozeInput" : "input";
     return item.entity.cloze && roll < 72 ? "clozeChoice" : "meaningChoice";
   }
   if (item.skillKey === "meaningRecognition") {
-    if (item.lane === "acquisition") return item.entity.cloze && roll < 45 ? "clozeChoice" : roll < 75 ? "reverseChoice" : "meaningChoice";
     if (item.entity.cloze && roll < (strength >= 2 ? 68 : 45)) return "clozeChoice";
     if (allowAudio && strength >= 2 && roll >= 82) return "audioChoice";
     return "meaningChoice";
   }
-  if (item.lane === "acquisition") return "reverseChoice";
   if (item.entity.cloze && strength >= 1 && roll < 45) return "clozeInput";
   if (allowAudio && strength >= 2 && roll >= 85) return "audioInput";
   return strength === 0 && roll < 45 ? "reverseChoice" : "input";
@@ -226,6 +229,12 @@ export function refreshStoredQuestion(bundle: RuntimeBundle, question: QuestionR
     .sort((a, b) => stableNumber(`${question.questionInstanceId}:${a}`) - stableNumber(`${question.questionInstanceId}:${b}`));
   const meaningChoices = () => [meaning, ...distractors(bundle, entity)]
     .sort((a, b) => stableNumber(`${question.questionInstanceId}:${a}`) - stableNumber(`${question.questionInstanceId}:${b}`));
+
+  if (question.lane === "acquisition") {
+    return question.skillKey === "meaningRecognition"
+      ? withSource({ ...base, kind: "meaningChoice", prompt: entity.lemma, choices: meaningChoices(), answer: meaning })
+      : withSource({ ...base, kind: "reverseChoice", prompt: meaning, choices: lemmaChoices(), answer: entity.lemma });
+  }
 
   if ((question.kind === "clozeInput" || question.kind === "clozeChoice") && entity.cloze) {
     return withSource({

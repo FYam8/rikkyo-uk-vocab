@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.6", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.7", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -115,13 +115,23 @@ describe("adaptive Phase 22 planner", () => {
     expect(["meaningChoice", "audioChoice", "clozeChoice", "clozeInput"]).toContain(q.kind);
   });
 
-  it("uses production and context questions in exam mode without requiring audio", () => {
+  it("starts unseen words with English-to-Japanese four-choice even in exam mode", () => {
     const b = bundle();
     const plan = ensurePlan("g1", 1200, undefined, "Europe/London", new Date("2026-09-17T12:00:00Z"));
     const item = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 10, { mode: "exam" })[0]!;
     const q = makeQuestion(b, item, { intensity: "exam", allowAudio: false });
-    expect(item.skillKey).toBe("formProduction");
-    expect(["input", "clozeInput"]).toContain(q.kind);
+    expect(item.skillKey).toBe("meaningRecognition");
+    expect(q.kind).toBe("meaningChoice");
+    expect(q.choices).toHaveLength(4);
+    expect(q.answer).toBe(item.entity.senses[0]?.glossJa);
+  });
+
+  it("introduces production with Japanese-to-English four-choice before input", () => {
+    const b = bundle(), e = b.core[0]!;
+    const q = makeQuestion(b, { entity: e, skillKey: "formProduction", lane: "acquisition" }, { intensity: "exam", allowAudio: false });
+    expect(q.kind).toBe("reverseChoice");
+    expect(q.choices).toHaveLength(4);
+    expect(q.answer).toBe(e.lemma);
   });
 
   it("turns a missed input into an objective retry after a Waseda-style gap", () => {
@@ -141,7 +151,7 @@ describe("adaptive Phase 22 planner", () => {
       questionInstanceId: "persisted-question",
       stableId: e.stableId,
       skillKey: "formProduction",
-      lane: "acquisition",
+      lane: "review",
       kind: "clozeChoice",
       prompt: "old prompt",
       context: "The passage uses “_____” in an important context.",
@@ -161,5 +171,28 @@ describe("adaptive Phase 22 planner", () => {
     expect(refreshed.isRetry).toBe(true);
     expect(refreshed.retryOf).toBe("original-question");
     expect(refreshed.sourceLabel).toBeUndefined();
+  });
+
+  it("converts an unanswered legacy acquisition input into four-choice on resume", () => {
+    const b = bundle();
+    const e = b.core[0]!;
+    const old: QuestionRun = {
+      questionInstanceId: "legacy-acquisition-input",
+      stableId: e.stableId,
+      skillKey: "meaningRecognition",
+      lane: "acquisition",
+      kind: "clozeInput",
+      prompt: "old prompt",
+      context: "old context _____",
+      choices: [],
+      answer: e.lemma,
+    };
+    const refreshed = refreshStoredQuestion(b, old);
+    expect(refreshed.questionInstanceId).toBe(old.questionInstanceId);
+    expect(refreshed.kind).toBe("meaningChoice");
+    expect(refreshed.prompt).toBe(e.lemma);
+    expect(refreshed.choices).toHaveLength(4);
+    expect(refreshed.answer).toBe(e.senses[0]?.glossJa);
+    expect(refreshed.context).toBeUndefined();
   });
 });
