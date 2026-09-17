@@ -3,7 +3,7 @@ import "./rich/styles.css";
 import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./runtime";
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "./rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, discardInvalidActiveSession, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, repairStartupTransientState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
 import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
@@ -337,7 +337,7 @@ async function answer(given: string) {
   else {
     session.wrong += 1;
     session.missedStableIds.add(q.stableId);
-    if (session.mode === "study" && !q.isRetry) {
+    if (session.mode === "study" && !q.isRetry && !session.queue.slice(session.index + 1).some((question) => question.isRetry && question.stableId === q.stableId)) {
       const retry = makeRetryQuestion(ctx.bundle, q, entity(q.stableId));
       session.queue.splice(Math.min(session.index + retryGap(entity(q.stableId)) + 1, session.queue.length), 0, retry);
     }
@@ -470,17 +470,18 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     return;
   }
   const refreshedQueue = stored.queue.map((question, index) => index < resumeIndex ? question : refreshStoredQuestion(ctx!.bundle, question));
+  const dedupedQueue = dedupeStoredQuestionQueue(refreshedQueue, resumeIndex);
   const diagnosticEvents = initialEvents.filter((e) => e.type === "DiagnosticAnswer" && e.payload.sessionId === stored.sessionId);
   session = {
     generationId: stored.generationId,
     sessionId: stored.sessionId,
     startedAt: stored.startedAt,
     mode: stored.mode,
-    queue: audioQuestionsEnabled(preferences) ? refreshedQueue : refreshedQueue.map(removeAudioRequirement),
+    queue: audioQuestionsEnabled(preferences) ? dedupedQueue : dedupedQueue.map(removeAudioRequirement),
     index: resumeIndex,
     shownAt: Date.now(),
     diagnostics: diagnosticEvents.map((e) => ({ correct: e.payload.correct === true })),
-    baseTotal: stored.baseTotal ?? refreshedQueue.filter((q) => !q.isRetry).length,
+    baseTotal: dedupedQueue.filter((q) => !q.isRetry).length,
     correct: stored.correct ?? 0,
     wrong: stored.wrong ?? 0,
     retryAnswered: stored.retryAnswered ?? 0,

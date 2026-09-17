@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeBundle, RuntimeEntity } from "../src/runtime";
 import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
 import type { QuestionRun, SkillState } from "../src/rich/types";
 
 function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : "Core"): RuntimeEntity {
@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" = i % 2 ? "Foundation" : 
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.7", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.8", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -58,6 +58,28 @@ describe("adaptive Phase 22 planner", () => {
     const queue = buildQueue(b, [due], plan, new Date("2026-09-14T12:00:00Z"), 10);
     expect(queue[0]?.lane).toBe("review");
     expect(queue[0]?.entity.stableId).toBe(due.stableId);
+  });
+
+  it("limits due meaning and production skills to one base question per word", () => {
+    const b = bundle();
+    const e = b.core[20]!;
+    const now = new Date("2026-09-14T12:00:00Z");
+    const meaning = { ...createInitialState("g1", e.stableId, "meaningRecognition", now), stage: "review" as const, dueAt: "2026-09-13T00:00:00.000Z", correct: 4, wrong: 0 };
+    const production = { ...createInitialState("g1", e.stableId, "formProduction", now), stage: "review" as const, dueAt: "2026-09-13T00:00:00.000Z", correct: 1, wrong: 2 };
+    const plan = { ...ensurePlan("g1", 1200, undefined, "Europe/London", now), acquisitionClosed: true };
+    const queue = buildQueue(b, [meaning, production], plan, now, 10);
+    expect(queue.filter((item) => item.entity.stableId === e.stableId)).toHaveLength(1);
+    expect(queue[0]?.skillKey).toBe("formProduction");
+  });
+
+  it("does not add a missing second skill as acquisition beside a due skill for the same word", () => {
+    const b = bundle();
+    const e = b.core[20]!;
+    const now = new Date("2026-09-14T12:00:00Z");
+    const due = { ...createInitialState("g1", e.stableId, "meaningRecognition", now), stage: "learning" as const, dueAt: "2026-09-13T00:00:00.000Z" };
+    const queue = buildQueue(b, [due], ensurePlan("g1", 1200, undefined, "Europe/London", now), now, 10);
+    expect(queue.filter((item) => item.entity.stableId === e.stableId)).toHaveLength(1);
+    expect(new Set(queue.map((item) => item.entity.stableId)).size).toBe(queue.length);
   });
 
   it("does not add acquisition when the daily acquisition lane is closed", () => {
@@ -194,5 +216,15 @@ describe("adaptive Phase 22 planner", () => {
     expect(refreshed.choices).toHaveLength(4);
     expect(refreshed.answer).toBe(e.senses[0]?.glossJa);
     expect(refreshed.context).toBeUndefined();
+  });
+
+  it("removes duplicate unanswered base and retry questions while preserving the answered prefix", () => {
+    const make = (id: string, stableId: string, isRetry = false): QuestionRun => ({
+      questionInstanceId: id, stableId, skillKey: "meaningRecognition", lane: "review",
+      kind: "meaningChoice", prompt: stableId, choices: ["a", "b", "c", "d"], answer: "a", ...(isRetry ? { isRetry: true } : {}),
+    });
+    const queue = [make("answered", "word-a"), make("duplicate-base", "word-a"), make("base-b", "word-b"), make("retry-a", "word-a", true), make("duplicate-retry-a", "word-a", true)];
+    const deduped = dedupeStoredQuestionQueue(queue, 1);
+    expect(deduped.map((question) => question.questionInstanceId)).toEqual(["answered", "base-b", "retry-a"]);
   });
 });

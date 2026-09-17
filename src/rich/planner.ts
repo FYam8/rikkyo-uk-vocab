@@ -52,6 +52,17 @@ export function ensurePlan(generationId: string, targetSeconds: number, existing
 export interface PlannedItem { entity: RuntimeEntity; skillKey: SkillKey; lane: Lane; state?: SkillState; }
 export interface QuestionOptions { allowAudio?: boolean; intensity?: "adaptive" | "exam"; }
 export interface StudyOptions { mode?: StudyMode; schedule?: ScheduleFilter; }
+function skillStrength(item: PlannedItem): number {
+  return (item.state?.correct ?? 0) - (item.state?.wrong ?? 0);
+}
+function uniquePlannedEntities(items: PlannedItem[]): PlannedItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.entity.stableId)) return false;
+    seen.add(item.entity.stableId);
+    return true;
+  });
+}
 function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
   if (entity.quizEligible === false || entity.studyLayer === "reference") return false;
   if (mode === "foundation") return entity.targetBand === "Foundation";
@@ -75,7 +86,10 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
     else if (state?.stage === "review" && Date.parse(state.dueAt) <= nowMs) items.push({ entity, skillKey, lane: "review", state });
   }
   const laneRank: Record<Lane, number> = { learning: 0, relearning: 1, provisional: 2, review: 3, acquisition: 4 };
-  items.sort((a, b) => laneRank[a.lane] - laneRank[b.lane] || Date.parse(a.state?.dueAt ?? "0") - Date.parse(b.state?.dueAt ?? "0") || priority(a.entity) - priority(b.entity) || stableNumber(a.entity.stableId) - stableNumber(b.entity.stableId));
+  items.sort((a, b) => laneRank[a.lane] - laneRank[b.lane] || Date.parse(a.state?.dueAt ?? "0") - Date.parse(b.state?.dueAt ?? "0") || skillStrength(a) - skillStrength(b) || priority(a.entity) - priority(b.entity) || stableNumber(a.entity.stableId) - stableNumber(b.entity.stableId));
+  const uniqueItems = uniquePlannedEntities(items);
+  items.length = 0;
+  items.push(...uniqueItems);
 
   if (!plan.acquisitionClosed && items.length < limit && mode !== "weak" && mode !== "review") {
     const introduced = new Set(plan.introducedStableIds);
@@ -85,8 +99,9 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
     const storedBudget = plan.acquisitionBudget ?? plan.acquisitionCap;
     const budgetLimit = Math.min(storedBudget, plan.acquisitionCap);
     let remainingBudget = Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
+    const queuedIds = new Set(items.map((item) => item.entity.stableId));
     const candidates = bundle.core
-      .filter((e) => matchesEntity(e, mode) && skillsFor(e).some((s) => {
+      .filter((e) => !queuedIds.has(e.stableId) && matchesEntity(e, mode) && skillsFor(e).some((s) => {
         const existing = byKey.get(stateKey(e.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";
       }))
@@ -110,6 +125,7 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
       if (isNewEntity && !introduced.has(entity.stableId) && introduced.size >= newEntityCap) continue;
       const state = byKey.get(skillToken);
       items.push({ entity, skillKey, lane: "acquisition", ...(state ? { state } : {}) });
+      queuedIds.add(entity.stableId);
       remainingBudget -= 1;
       introducedSkills.add(skillToken);
       if (isNewEntity) introduced.add(entity.stableId);
@@ -252,6 +268,20 @@ export function refreshStoredQuestion(bundle: RuntimeBundle, question: QuestionR
     return withSource({ ...base, prompt: meaning, choices: lemmaChoices(), answer: entity.lemma });
   }
   return withSource({ ...base, kind: question.kind === "clozeChoice" ? "meaningChoice" : question.kind, prompt: entity.lemma, choices: meaningChoices(), answer: meaning });
+}
+
+/** Keeps answered positions stable while limiting remaining base and retry questions to one per word. */
+export function dedupeStoredQuestionQueue(queue: QuestionRun[], resumeIndex: number): QuestionRun[] {
+  const prefix = queue.slice(0, resumeIndex);
+  const seenBase = new Set(prefix.filter((question) => !question.isRetry).map((question) => question.stableId));
+  const seenRetry = new Set(prefix.filter((question) => question.isRetry).map((question) => question.stableId));
+  const remaining = queue.slice(resumeIndex).filter((question) => {
+    const seen = question.isRetry ? seenRetry : seenBase;
+    if (seen.has(question.stableId)) return false;
+    seen.add(question.stableId);
+    return true;
+  });
+  return [...prefix, ...remaining];
 }
 
 export function retryGap(entity: RuntimeEntity): 6 | 8 { return entity.priority === "S" || entity.targetBand === "Foundation" ? 6 : 8; }
