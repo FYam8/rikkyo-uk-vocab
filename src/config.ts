@@ -1,7 +1,7 @@
 export const APP_ID = "rikkyo-uk-vocab" as const;
-export const PRODUCT_VERSION = "3.3.1" as const;
+export const PRODUCT_VERSION = "3.4.0" as const;
 export const ENGINE_VERSION = "common-vocab-engine/1.0.0" as const;
-export const DATASET_VERSION = "0.22.1-core" as const;
+export const DATASET_VERSION = "0.23.0-reselected" as const;
 export const PERSISTENCE_SCHEMA_VERSION = 3 as const;
 export const EXPORT_FORMAT_VERSION = 3 as const;
 export const INDEXED_DB_VERSION = 3 as const;
@@ -11,8 +11,8 @@ export const LOCAL_STORAGE_PREFIX = "rikkyo-uk-vocab:" as const;
 export const BROADCAST_CHANNEL = "rikkyo-uk-vocab:coordination:v1" as const;
 export const EXPORT_FORMAT = "rikkyo-uk-vocab-export/v3" as const;
 export const CORE_ENTITY_COUNT = 241 as const;
-export const REGISTRY_ENTITY_COUNT = 623 as const;
-export const ENRICHMENT_VERSION = "2026-09-17-fy24-fy26-ab" as const;
+export const REGISTRY_ENTITY_COUNT = 801 as const;
+export const ENRICHMENT_VERSION = "2026-09-17-reselected-v1" as const;
 
 export const SCHEDULER_CONFIG = Object.freeze({
   algorithm: "FSRS-6",

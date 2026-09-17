@@ -9,10 +9,18 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.3.1" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.22.1-core" || tuple.enrichmentVersion !== "2026-09-17-fy24-fy26-ab") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.4.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.23.0-reselected" || tuple.enrichmentVersion !== "2026-09-17-reselected-v1") throw new Error("release tuple mismatch");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
   if (await page.locator("#schedule-filter").count()) throw new Error("A/B schedule output filter must not be shown");
+  await page.getByRole("link", { name: /一覧/ }).click();
+  if (await page.locator('#word-filter option[value="A"], #word-filter option[value="B"]').count()) throw new Error("A/B word filters must not be shown");
+  await page.locator("#word-filter").selectOption("challenge");
+  await page.getByText("39語", { exact: true }).waitFor();
+  if (Number((await page.locator(".result-count").innerText()).replace(/\D/g, "")) !== 39) throw new Error("Challenge band count mismatch");
+  await page.locator("#word-search").fill("photosynthesis");
+  await page.getByText("photosynthesis", { exact: true }).waitFor();
+  await page.getByRole("link", { name: /学習/ }).click();
 
   await page.locator("#session-size").selectOption("10");
   await page.locator("#study-mode").selectOption("exam");
@@ -115,9 +123,9 @@ try {
   await page.getByRole("heading", { name: "確認回数 TOP 100" }).waitFor();
 
   await page.getByRole("link", { name: /一覧/ }).click();
-  await page.locator("#word-search").fill("come up with");
-  await page.getByText("come up with", { exact: true }).click();
-  await page.getByText("立教の出題傾向から生成した例文", { exact: true }).waitFor();
+  await page.locator("#word-search").fill("photosynthesis");
+  await page.getByText("photosynthesis", { exact: true }).click();
+  await page.getByText(/過去問での出現|立教の出題傾向から生成した例文/).waitFor();
 
   await page.getByRole("link", { name: /設定/ }).click();
   await page.getByRole("heading", { name: "設定" }).waitFor();
@@ -161,7 +169,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.3.1 dark-mode contrast, unified A/B, exam difficulty, audio fallback, Waseda-parity retry, six-paper evidence, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.4.0 reselected difficulty, Challenge 39, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper evidence, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

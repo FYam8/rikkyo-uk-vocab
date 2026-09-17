@@ -5,7 +5,7 @@ export type SkillKey = "meaningRecognition" | "formProduction";
 export type Stage = "learning" | "review" | "relearning" | "provisional" | "acquisitionCandidate";
 export type Lane = "learning" | "relearning" | "provisional" | "review" | "acquisition";
 export type RatingName = "Again" | "Hard" | "Good";
-export type StudyMode = "recommended" | "foundation" | "core" | "exam" | "unlearned" | "weak" | "review" | "frequent" | "random";
+export type StudyMode = "recommended" | "foundation" | "core" | "challenge" | "exam" | "unlearned" | "weak" | "review" | "frequent" | "random";
 export type ScheduleFilter = "all" | "A" | "B";
 export type QuestionKind = "meaningChoice" | "reverseChoice" | "input" | "audioChoice" | "audioInput" | "clozeChoice" | "clozeInput";
 

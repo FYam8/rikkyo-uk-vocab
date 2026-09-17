@@ -168,7 +168,7 @@ async function homeView(ctx: AppContext): Promise<void> {
         <article><strong>${mastery}%</strong><span>習得率</span></article>
       </div>
     </section>
-    <section class="panel info-panel"><h2>この単語帳の設計</h2><p>立教英国のFY24–FY26 A/B日程を基にしたCore 241を学習します。正誤は自己申告ではなく回答結果から記録し、復習時期はFSRS-6で調整します。</p><div class="scope-line"><span>Core data ${ctx.bundle.core.length}/241</span><span>Stable IDs ${ctx.bundle.registry.length}/623</span><span>data ${esc(ctx.bundle.manifest.dataVersion)}</span></div></section>`,
+    <section class="panel info-panel"><h2>この単語帳の設計</h2><p>立教英国のFY24–FY26英語6冊を統合し、入試水準へ再選定した241語を学習します。正誤は回答結果から記録し、復習時期はFSRS-6で調整します。</p><div class="scope-line"><span>Active ${ctx.bundle.core.length}/241</span><span>Stable IDs ${ctx.bundle.registry.length}/801</span><span>data ${esc(ctx.bundle.manifest.dataVersion)}</span></div></section>`,
   );
 
   document.querySelector("#speak-global")?.addEventListener("click", () => speak("Rikkyo UK Vocabulary Coach"));
