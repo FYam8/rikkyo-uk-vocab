@@ -7,4 +7,4 @@ const html = await fetch(`${scope}?compat=${Date.now()}`, { cache: "no-store" })
 });
 const source = html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"/)?.[1];
 if (!source || source.endsWith("/assets/index-CwJusQDL.js")) throw new Error("COMPAT_CURRENT_ENTRY_NOT_FOUND");
-await import(`${source}?compat=3.5.3`);
+await import(`${source}?compat=3.5.4`);

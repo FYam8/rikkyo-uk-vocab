@@ -73,16 +73,21 @@ jobs:
           manifest=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
           release=json.loads(Path('public/release-manifest.json').read_text())
           lock=json.loads(Path('common-engine.lock.json').read_text())
-          assert release['productVersion']=='3.5.3'
+          assert release['productVersion']=='3.5.4'
           assert release['persistenceSchemaVersion']==3
           assert release['exportFormatVersion']==3
           assert release['indexedDbVersion']==3
           assert release['datasetVersion']=='0.24.0-lexical'
-          assert release['enrichmentVersion']=='2026-09-17-reselected-v2'
+          assert release['enrichmentVersion']=='2026-09-17-reselected-v3'
           assert manifest['enrichmentVersion']==release['enrichmentVersion']
           enrichment=json.loads((base/manifest['enrichment']).read_text(encoding='utf-8'))
           assert enrichment['entityCount']==241
           assert enrichment['sourceMatchedEntityCount']==132
+          assert all('The passage uses' not in (x.get('generatedExample') or {}).get('sentence', '') for x in enrichment['entities'].values())
+          assert all('important context' not in (x.get('cloze') or {}).get('sentence', '') for x in enrichment['entities'].values())
+          method=next(x for x in enrichment['entities'].values() if x['lemma']=='method')
+          assert method['cloze']['sentence']=='The electricity experiment will take place next week, so please review your class notes and _____.'
+          assert method['cloze']['provenance']=='past-paper-derived'
           assert sum(x.get('selectionOrigin') == 'rikkyo-transfer' for x in enrichment['entities'].values()) >= 105
           assert lock['sourceCommit']=='3e6fcb1701e721ccaf070df915446004f7f312ef'
           assert lock['hotlink'] is False
@@ -153,16 +158,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Wait for the v3.5.3 release on Pages
+      - name: Wait for the v3.5.4 release on Pages
         run: |
           for i in {1..30}; do
             version=$(curl -fsS "https://fyam8.github.io/rikkyo-uk-vocab/release-manifest.json?sha=${GITHUB_SHA}&attempt=${i}" | python -c 'import json,sys; print(json.load(sys.stdin).get("productVersion", ""))' || true)
-            if [ "$version" = "3.5.3" ]; then
+            if [ "$version" = "3.5.4" ]; then
               exit 0
             fi
             sleep 2
           done
-          echo "GitHub Pages did not publish v3.5.3 in time" >&2
+          echo "GitHub Pages did not publish v3.5.4 in time" >&2
           exit 1
 
       - name: Install production browser runtime

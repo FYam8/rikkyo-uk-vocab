@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.3" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v2") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.5.4" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v3") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -63,6 +63,41 @@ try {
   }));
   if (!repaired.preferences || repaired.memory?.correct !== 2 || repaired.active) throw new Error("Safari startup repair did not preserve learning history or clear invalid transient state");
   await repairContext.close();
+
+  const clozeContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const clozeSeed = await clozeContext.newPage();
+  await clozeSeed.goto(baseURL, { waitUntil: "networkidle" });
+  await clozeSeed.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  const method = await clozeSeed.evaluate(async () => {
+    const data = await fetch("./data/enrichment.json", { cache: "no-store" }).then((response) => response.json());
+    const entities = Object.values(data.entities);
+    if (entities.some((item) => item.cloze?.sentence.includes("The passage uses") || item.generatedExample?.sentence.includes("The passage uses"))) throw new Error("generic cloze placeholder remains");
+    return entities.find((item) => item.lemma === "method");
+  });
+  if (method?.cloze?.sentence !== "The electricity experiment will take place next week, so please review your class notes and _____." || method.cloze.provenance !== "past-paper-derived") throw new Error("method source cloze mismatch");
+  await clozeSeed.evaluate(async (methodItem) => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(["meta", "sessions"], "readwrite");
+      const generation = tx.objectStore("meta").get("generation");
+      generation.onsuccess = () => {
+        const now = new Date().toISOString();
+        tx.objectStore("sessions").put({ key: "active-session", generationId: generation.result.generationId, sessionId: "qa-method-cloze", mode: "study", queue: [{ questionInstanceId: "qa-method-question", stableId: methodItem.stableId, skillKey: "formProduction", lane: "acquisition", kind: "clozeInput", prompt: "方法", context: methodItem.cloze.sentence, choices: [], answer: "method", sourceLabel: "FY26 A · PDF p.8" }], resumeIndex: 0, startedAt: now, updatedAt: now, baseTotal: 1, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: [], lastAppliedRevision: generation.result.revision });
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+  }), method);
+  await clozeSeed.close();
+  const clozePage = await clozeContext.newPage();
+  await clozePage.goto(baseURL, { waitUntil: "networkidle" });
+  await clozePage.getByText("The electricity experiment will take place next week, so please review your class notes and _____.", { exact: true }).waitFor();
+  await clozePage.getByText("意味：方法", { exact: true }).waitFor();
+  await clozePage.locator(".question-flags").getByText("新出", { exact: true }).waitFor();
+  if (await clozePage.locator(".question-flags").getByText("acquisition", { exact: true }).count()) throw new Error("internal acquisition label is visible");
+  await clozeContext.close();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
@@ -239,7 +274,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.3 Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.5.4 valid source cloze, Japanese lane labels, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

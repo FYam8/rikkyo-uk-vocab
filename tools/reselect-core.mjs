@@ -194,6 +194,34 @@ const TRANSFER = [
 ];
 
 const GENERATED = {
+  surprise: ["To everyone's surprise, the smallest plant grew the fastest.", "みんなが驚いたことに、いちばん小さな植物が最も速く育ちました。"],
+  invite: ["The science club will invite a local researcher to speak.", "科学部は地域の研究者を講演に招きます。"],
+  difference: ["The experiment showed a clear difference between the two samples.", "実験は2つの試料の明確な違いを示しました。"],
+  miss: ["If you leave late, you may miss the school bus.", "遅く出発すると、スクールバスに乗り遅れるかもしれません。"],
+  memory: ["The smell of the sea brought back a childhood memory.", "海の香りが子どもの頃の記憶をよみがえらせました。"],
+  complete: ["Each group must complete the report by Friday.", "各グループは金曜日までに報告書を完成させなければなりません。"],
+  continue: ["The researchers will continue the experiment next week.", "研究者たちは来週も実験を続けます。"],
+  lie: ["The village appears to lie between the river and the forest.", "その村は川と森の間に位置しているようです。"],
+  online: ["Students can submit their homework online before midnight.", "生徒は深夜までに宿題をオンラインで提出できます。"],
+  data: ["The students collected data from three experiments.", "生徒たちは3つの実験からデータを集めました。"],
+  confused: ["Maya felt confused because the instructions were unclear.", "説明が不明瞭だったため、マヤは混乱しました。"],
+  dream: ["Her dream is to become an environmental scientist.", "彼女の夢は環境科学者になることです。"],
+  cost: ["The new equipment will cost more than the school expected.", "新しい機材には学校の予想以上の費用がかかります。"],
+  trouble: ["The team had trouble finding reliable information.", "チームは信頼できる情報を見つけるのに苦労しました。"],
+  record: ["Students should record their results in the table.", "生徒は結果を表に記録するべきです。"],
+  recycle: ["The school encourages students to recycle plastic bottles.", "学校は生徒にペットボトルをリサイクルするよう勧めています。"],
+  yet: ["The results have not been published yet.", "結果はまだ公表されていません。"],
+  investigate: ["The class will investigate how light affects plant growth.", "クラスでは光が植物の成長にどう影響するか調査します。"],
+  hold: ["The container can hold up to two litres of water.", "その容器には最大2リットルの水が入ります。"],
+  human: ["The project examined the effect of human activity on wildlife.", "その研究は人間の活動が野生生物に与える影響を調べました。"],
+  expensive: ["The new microscope was too expensive for the club to buy.", "新しい顕微鏡は部が購入するには高価すぎました。"],
+  break: ["The glass container may break if you drop it.", "そのガラス容器は落とすと割れるかもしれません。"],
+  chance: ["The competition gave her a chance to present her research.", "その大会は彼女に研究を発表する機会を与えました。"],
+  amaze: ["The results of the experiment will amaze the students.", "その実験結果は生徒たちを驚かせるでしょう。"],
+  follow: ["Please follow the safety instructions during the experiment.", "実験中は安全上の指示に従ってください。"],
+  spend: ["The group will spend two weeks collecting data.", "グループは2週間かけてデータを集めます。"],
+  close: ["Please close the laboratory door when you leave.", "退出するときは実験室のドアを閉めてください。"],
+  interview: ["The students will interview local residents about recycling.", "生徒たちはリサイクルについて地域住民に聞き取りをします。"],
   photosynthesis: ["The class investigated how light affects photosynthesis.", "授業では光が光合成にどう影響するかを調べました。"],
   retention: ["The students measured water retention in three kinds of soil.", "生徒たちは3種類の土の保水性を測定しました。"],
   nutrient: ["Healthy soil contains nutrients that plants need.", "健康な土には植物が必要とする栄養素が含まれます。"],
@@ -387,23 +415,27 @@ function generatedFor(lemma, meaning) {
     ja: `「${meaning}」の使い方を文脈で確認する例文です。`,
     provenance: "generated-from-rikkyo-patterns",
   };
-  const sentence = `The passage uses “${lemma}” in an important context.`;
-  return { sentence, ja: `本文では「${meaning}」という重要な文脈で使われます。`, provenance: "generated-from-rikkyo-patterns" };
+  return null;
 }
 const entities = {};
 for (const item of selected) {
   const [stableId, lemma, meaningJa, , priority, studyLayer, targetBand] = item.row;
   const evidence = item.evidence;
+  const sourceExample = sourceExampleFor(lemma);
   const generatedExample = item.generated ?? generatedFor(lemma, meaningJa);
-  const clozeSentence = generatedExample.sentence.replace(matcher([lemma]), "_____");
+  const sourceCloze = sourceExample?.matchedForm.toLowerCase() === lemma.toLowerCase()
+    ? sourceExample.sentence.replace(matcher([sourceExample.matchedForm]), "_____")
+    : "";
+  const generatedCloze = generatedExample?.sentence.replace(matcher([lemma]), "_____") ?? "";
+  const clozeSentence = sourceCloze.includes("_____") ? sourceCloze : generatedCloze;
   entities[stableId] = {
     stableId, lemma, meaningJa, priority, studyLayer, targetBand, schedules: ["A", "B"],
     observedFrequency: evidence.reduce((n, x) => n + x.count, 0),
     years: [...new Set(evidence.map((x) => x.year))].sort(),
     sourceSchedules: [...new Set(evidence.map((x) => x.schedule))].sort(),
     categories: [...new Set(evidence.map((x) => x.category))], evidence,
-    sourceExample: sourceExampleFor(lemma), generatedExample,
-    cloze: clozeSentence.includes("_____") ? { sentence: clozeSentence, answer: lemma, provenance: "generated-from-rikkyo-patterns" } : null,
+    sourceExample, generatedExample,
+    cloze: clozeSentence.includes("_____") ? { sentence: clozeSentence, answer: lemma, provenance: sourceCloze.includes("_____") ? "past-paper-derived" : "generated-from-rikkyo-patterns" } : null,
     selectionOrigin: item.origin,
   };
 }
@@ -414,7 +446,7 @@ for (let i = 0; i < 13; i += 1) {
 }
 await writeFile(new URL("../public/data/registry.json", import.meta.url), `${JSON.stringify(registry)}\n`);
 await writeFile(new URL("../public/data/enrichment.json", import.meta.url), `${JSON.stringify({
-  format: "rikkyo-vocab-enrichment/v1", version: "2026-09-17-reselected-v2",
+  format: "rikkyo-vocab-enrichment/v1", version: "2026-09-17-reselected-v3",
   sourceScope: ["FY24-A", "FY24-B", "FY25-A", "FY25-B", "FY26-A", "FY26-B"],
   generationMethod: "lexical-difficulty selection independent of score bands; sense-aware paper evidence; Rikkyo-theme transfer vocabulary; audio-optional generated practice sentences",
   entityCount: 241,

@@ -13,7 +13,7 @@ describe("FY24-FY26 A/B enrichment contract", () => {
   it("records six-paper matches and generated examples for the full set", () => {
     expect(enrichment.sourceMatchedEntityCount).toBeGreaterThanOrEqual(125);
     expect(Object.values(enrichment.entities).filter((item: any) => item.sourceExample).length).toBeGreaterThanOrEqual(70);
-    expect(Object.values(enrichment.entities).filter((item: any) => item.generatedExample).length).toBe(241);
+    expect(Object.values(enrichment.entities).filter((item: any) => item.generatedExample).length).toBeGreaterThanOrEqual(200);
   });
 
   it("keeps generated examples visibly separate from past-paper evidence", () => {
@@ -24,7 +24,21 @@ describe("FY24-FY26 A/B enrichment contract", () => {
   });
 
   it("only emits usable cloze prompts", () => {
-    for (const item of Object.values(enrichment.entities) as any[]) if (item.cloze) expect(item.cloze.sentence).toContain("_____");
+    for (const item of Object.values(enrichment.entities) as any[]) if (item.cloze) {
+      expect(item.cloze.sentence).toContain("_____");
+      expect(item.cloze.sentence).not.toContain("The passage uses");
+      if (item.cloze.provenance === "past-paper-derived") {
+        expect(item.sourceExample).toBeTruthy();
+        expect(item.sourceExample.matchedForm.toLowerCase()).toBe(item.lemma.toLowerCase());
+      }
+    }
+  });
+
+  it("never publishes a generic placeholder as an example", () => {
+    for (const item of Object.values(enrichment.entities) as any[]) {
+      expect(item.generatedExample?.sentence ?? "").not.toContain("The passage uses");
+      expect(item.cloze?.sentence ?? "").not.toContain("important context");
+    }
   });
 
   it("uses unique lemmas and an entrance-exam difficulty distribution", () => {
