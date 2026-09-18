@@ -20,8 +20,8 @@ export function buildDiagnostic(bundle: RuntimeBundle, seed = new Date().toISOSt
   const challengeIds = new Set(challenge.map((x) => x.stableId));
   const productionPool = [...challenge, ...take(eligible(bundle).filter((x) => !challengeIds.has(x.stableId)), 8 - challenge.length, `${seed}:production-fallback`)];
   const out: QuestionRun[] = [];
-  for (const e of [...foundation, ...core]) out.push({ questionInstanceId: crypto.randomUUID(), stableId: e.stableId, skillKey: "meaningRecognition", lane: "acquisition", prompt: e.lemma, choices: meaningChoices(bundle, e, `${seed}:${e.stableId}`), answer: e.senses[0]?.glossJa ?? "" });
-  for (const e of productionPool) out.push({ questionInstanceId: crypto.randomUUID(), stableId: e.stableId, skillKey: "formProduction", lane: "acquisition", prompt: e.senses[0]?.glossJa ?? "", choices: [], answer: e.lemma });
+  for (const e of [...foundation, ...core]) out.push({ questionInstanceId: crypto.randomUUID(), stableId: e.stableId, skillKey: "meaningRecognition", lane: "acquisition", kind: "meaningChoice", prompt: e.lemma, choices: meaningChoices(bundle, e, `${seed}:${e.stableId}`), answer: e.senses[0]?.glossJa ?? "" });
+  for (const e of productionPool) out.push({ questionInstanceId: crypto.randomUUID(), stableId: e.stableId, skillKey: "formProduction", lane: "acquisition", kind: "input", prompt: e.senses[0]?.glossJa ?? "", choices: [], answer: e.lemma });
   return out.slice(0, 24);
 }
 

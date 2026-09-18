@@ -19,6 +19,7 @@ describe("FY24-FY26 A/B enrichment contract", () => {
   it("keeps generated examples visibly separate from past-paper evidence", () => {
     for (const item of Object.values(enrichment.entities) as any[]) {
       if (item.generatedExample) expect(item.generatedExample.provenance).toBe("generated-from-rikkyo-patterns");
+      if (item.generatedExample) expect(item.generatedExample.ja).not.toContain("使い方を文脈で確認する例文です");
       if (item.sourceExample) expect(item.evidence.length).toBeGreaterThan(0);
     }
   });

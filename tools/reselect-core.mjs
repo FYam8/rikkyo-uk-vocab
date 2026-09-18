@@ -218,6 +218,38 @@ const TRANSFER = [
 ];
 
 const GENERATED = {
+  "in order to": ["She left early in order to catch the first train.", "彼女は始発列車に間に合うために早く出発しました。"],
+  "even if": ["Try the question even if you are not completely sure.", "完全に確信がなくても、その問題に挑戦してください。"],
+  mistake: ["She noticed her mistake and corrected the answer.", "彼女は自分の間違いに気づき、答えを直しました。"],
+  suggest: ["I suggest taking the earlier train.", "もっと早い電車に乗ることを提案します。"],
+  climate: ["The region has a warm climate for most of the year.", "その地域は一年の大半が温暖な気候です。"],
+  plastic: ["The bottle is made of plastic.", "そのボトルはプラスチックでできています。"],
+  allow: ["The rules allow students to use the library after school.", "規則により、生徒は放課後に図書館を利用できます。"],
+  environment: ["We can protect the environment by reducing waste.", "ごみを減らすことで環境を守れます。"],
+  explain: ["Can you explain why you chose that answer?", "なぜその答えを選んだのか説明できますか。"],
+  pain: ["He was hurt, but he was not in any pain.", "彼はけがをしましたが、痛みはありませんでした。"],
+  power: ["The device needs electrical power.", "その装置には電力が必要です。"],
+  catch: ["If you leave now, you can catch the last bus.", "今出発すれば最終バスに間に合います。"],
+  reach: ["The train will reach the station at noon.", "その列車は正午に駅へ到着します。"],
+  influence: ["Friends can influence the choices we make.", "友人は私たちの選択に影響を与えることがあります。"],
+  soil: ["The researchers collected soil from the ground.", "研究者たちは地面から土を採取しました。"],
+  begin: ["The meeting will begin at nine o'clock.", "会議は9時に始まります。"],
+  nature: ["Scientists can find useful ideas in nature.", "科学者は自然の中から役立つ着想を得ることがあります。"],
+  leave: ["We have to leave home by seven.", "私たちは7時までに家を出なければなりません。"],
+  experience: ["Travel can be a valuable learning experience.", "旅行は貴重な学習経験になり得ます。"],
+  describe: ["How would you describe the dish you tried?", "あなたが食べた料理をどのように説明しますか。"],
+  loss: ["The accident caused a serious loss for the company.", "その事故は会社に大きな損失をもたらしました。"],
+  discover: ["Researchers hope to discover something new.", "研究者たちは新しい何かを発見したいと考えています。"],
+  notice: ["Did you notice the sign near the door?", "ドアの近くの標識に気づきましたか。"],
+  agree: ["I agree with your idea because it will save time.", "時間を節約できるので、私はあなたの考えに賛成です。"],
+  deliver: ["The company will deliver the package tomorrow.", "会社は明日その荷物を届けます。"],
+  important: ["It is important to notice words such as 'however'.", "「however」のような語に気づくことが重要です。"],
+  solve: ["We need to solve the problem together.", "私たちは一緒にその問題を解決する必要があります。"],
+  support: ["The evidence does not support that conclusion.", "その証拠は、その結論を裏づけていません。"],
+  choose: ["Please choose the best answer.", "最も適切な答えを選んでください。"],
+  protect: ["The cover helps protect the device from damage.", "そのカバーは装置を損傷から守るのに役立ちます。"],
+  result: ["The final result surprised the researchers.", "最終結果は研究者たちを驚かせました。"],
+  prefer: ["I prefer the second plan because it is simpler.", "より簡単なので、私は2番目の案の方を好みます。"],
   condition: ["The machine works well under this condition.", "その機械はこの条件下で正常に動きます。"],
   energy: ["Solar panels turn sunlight into energy.", "太陽光パネルは日光をエネルギーに変えます。"],
   "even though": ["Even though he was tired, he continued working.", "彼は疲れていたにもかかわらず、作業を続けました。"],
@@ -445,14 +477,10 @@ if (new Set(selected.map((x) => x.row[0])).size !== 241) throw new Error("duplic
 const previousRegistry = JSON.parse(await readFile(new URL("../public/data/registry.json", import.meta.url), "utf8"));
 const registry = [...new Set([...previousRegistry, ...selected.map((x) => x.row[0])])].sort();
 
-function generatedFor(lemma, meaning) {
+function generatedFor(lemma) {
   const fixed = GENERATED[lemma];
   if (fixed) return { sentence: fixed[0], ja: fixed[1], provenance: "generated-from-rikkyo-patterns" };
-  if (wasedaCloze[lemma]) return {
-    sentence: wasedaCloze[lemma].replace("_____", lemma),
-    ja: `「${meaning}」の使い方を文脈で確認する例文です。`,
-    provenance: "generated-from-rikkyo-patterns",
-  };
+  if (wasedaCloze[lemma]) throw new Error(`Missing curated Japanese translation for generated example: ${lemma}`);
   return null;
 }
 function replaceFirst(text, list) {
@@ -464,7 +492,7 @@ for (const item of selected) {
   const [stableId, lemma, meaningJa, , priority, studyLayer, targetBand] = item.row;
   const evidence = item.evidence;
   const sourceExample = sourceExampleFor(lemma);
-  const generatedExample = item.generated ?? generatedFor(lemma, meaningJa);
+  const generatedExample = item.generated ?? generatedFor(lemma);
   const sourceCloze = sourceExample?.matchedForm.toLowerCase() === lemma.toLowerCase()
     ? replaceFirst(sourceExample.sentence, [sourceExample.matchedForm])
     : "";

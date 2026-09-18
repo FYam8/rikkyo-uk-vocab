@@ -1,0 +1,56 @@
+{
+  "format": "common-vocab-learning-ui-contract/v1",
+  "version": "1.0.0",
+  "sourceOfTruth": "Waseda Vocabulary production UX",
+  "sessionProgress": {
+    "selectedCountMeans": "baseQuestions",
+    "retryCountIsSeparate": true,
+    "retryMustNotIncreaseBaseDenominator": true,
+    "baseLabel": "基本",
+    "retryLabel": "再確認"
+  },
+  "questionKinds": {
+    "meaningChoice": {
+      "label": "選択式・英→日",
+      "instruction": "最も適切な意味を選んでください"
+    },
+    "reverseChoice": {
+      "label": "選択式・日→英",
+      "instruction": "対応する英語を選んでください"
+    },
+    "input": {
+      "label": "日→英・入力",
+      "instruction": "対応する英語を入力してください"
+    },
+    "audioChoice": {
+      "label": "音声→意味選択",
+      "instruction": "音声を聞いて意味を選んでください"
+    },
+    "audioInput": {
+      "label": "音声→英語入力",
+      "instruction": "音声を聞いて英語を入力してください"
+    },
+    "clozeChoice": {
+      "label": "文脈・選択",
+      "instruction": "空所に入る語句を選んでください"
+    },
+    "clozeInput": {
+      "label": "文脈・入力",
+      "instruction": "空所に入る見出し語を英語で入力してください"
+    }
+  },
+  "introduction": {
+    "meaningRecognition": "meaningChoice",
+    "formProduction": "reverseChoice"
+  },
+  "resultMetrics": [
+    "accuracy",
+    "baseQuestions",
+    "retryQuestions",
+    "totalAnswers"
+  ],
+  "accessibility": {
+    "audioFallbackRequired": true,
+    "answerAndExplanationSameScreen": true
+  }
+}

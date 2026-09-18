@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.5.9" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.6.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -119,6 +119,66 @@ try {
   if (await clozePage.locator(".question-flags").getByText("acquisition", { exact: true }).count()) throw new Error("internal acquisition label is visible");
   await clozeContext.close();
 
+  const diagnosticContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const diagnosticSeed = await diagnosticContext.newPage();
+  await diagnosticSeed.goto(baseURL, { waitUntil: "networkidle" });
+  await diagnosticSeed.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await diagnosticSeed.evaluate(async () => {
+    const first = await fetch("./data/enrichment.json", { cache: "no-store" }).then((response) => response.json()).then((data) => Object.values(data.entities)[0]);
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const tx = request.result.transaction(["meta", "sessions"], "readwrite");
+        const generation = tx.objectStore("meta").get("generation");
+        generation.onsuccess = () => {
+          const now = new Date().toISOString();
+          tx.objectStore("sessions").put({ key: "active-session", generationId: generation.result.generationId, sessionId: "qa-legacy-diagnostic-input", mode: "diagnostic", queue: [{ questionInstanceId: "qa-production", stableId: first.stableId, skillKey: "formProduction", lane: "acquisition", prompt: "old prompt", choices: [], answer: "old answer" }], resumeIndex: 0, startedAt: now, updatedAt: now, baseTotal: 1, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: [], lastAppliedRevision: generation.result.revision });
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+  });
+  await diagnosticSeed.close();
+  const diagnosticPage = await diagnosticContext.newPage();
+  await diagnosticPage.goto(baseURL, { waitUntil: "networkidle" });
+  await diagnosticPage.locator(".question-flags").getByText("日→英・入力", { exact: true }).waitFor();
+  await diagnosticPage.getByText("対応する英語を入力してください", { exact: true }).waitFor();
+  if (await diagnosticPage.locator("#answer-input").count() !== 1 || await diagnosticPage.locator(".rich-choice").count() !== 0) throw new Error("diagnostic production question is not text input");
+  await diagnosticContext.close();
+
+  const retryContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const retrySeed = await retryContext.newPage();
+  await retrySeed.goto(baseURL, { waitUntil: "networkidle" });
+  await retrySeed.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await retrySeed.evaluate(async () => {
+    const entities = await fetch("./data/enrichment.json", { cache: "no-store" }).then((response) => response.json()).then((data) => Object.values(data.entities).slice(0, 10));
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const tx = request.result.transaction(["meta", "sessions"], "readwrite");
+        const generation = tx.objectStore("meta").get("generation");
+        generation.onsuccess = () => {
+          const now = new Date().toISOString();
+          const base = entities.map((entity, index) => ({ questionInstanceId: `qa-base-${index}`, stableId: entity.stableId, skillKey: "meaningRecognition", lane: "review", kind: "meaningChoice", prompt: entity.lemma, choices: [entity.meaningJa], answer: entity.meaningJa }));
+          const retry = { ...base[0], questionInstanceId: "qa-retry", isRetry: true, retryOf: "qa-base-0" };
+          tx.objectStore("sessions").put({ key: "active-session", generationId: generation.result.generationId, sessionId: "qa-retry-progress", mode: "study", queue: [...base, retry], resumeIndex: 10, startedAt: now, updatedAt: now, baseTotal: 10, correct: 9, wrong: 1, retryAnswered: 0, missedStableIds: [base[0].stableId], lastAppliedRevision: generation.result.revision });
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+  });
+  await retrySeed.close();
+  const retryPage = await retryContext.newPage();
+  await retryPage.goto(baseURL, { waitUntil: "networkidle" });
+  await retryPage.locator(".sessionbar b").getByText("再確認", { exact: true }).waitFor();
+  await retryPage.locator(".sessionbar small").getByText("基本 10/10 ・ 再確認 1", { exact: true }).waitFor();
+  await retryPage.locator(".question-flags").getByText(/再確認/).waitFor();
+  await retryContext.close();
+
   const challengeContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const challengePage = await challengeContext.newPage();
   await challengePage.goto(baseURL, { waitUntil: "networkidle" });
@@ -194,6 +254,8 @@ try {
   await page.locator("#study-mode").selectOption("exam");
   await page.getByRole("button", { name: "学習を始める" }).click();
   await page.locator(".rich-choice").first().waitFor();
+  await page.locator(".sessionbar b").getByText("問題 1 / 10", { exact: true }).waitFor();
+  await page.locator(".sessionbar small").getByText("基本 1/10", { exact: true }).waitFor();
   if (await page.locator(".rich-choice").count() !== 4) throw new Error("unseen exam item must start with four choices");
   await page.locator(".question-flags").getByText("選択式・英→日", { exact: true }).waitFor();
   await page.locator(".question-flags").getByText("新出", { exact: true }).waitFor();
@@ -352,7 +414,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.5.9 closed-cap Challenge focus, one-word-per-session deduplication, Waseda-parity four-choice introduction, persisted-question refresh, audited cloze corpus, Japanese lane labels, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, Waseda-parity retry, six-paper transfer, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.6.0 shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

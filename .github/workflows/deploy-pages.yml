@@ -73,7 +73,7 @@ jobs:
           manifest=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
           release=json.loads(Path('public/release-manifest.json').read_text())
           lock=json.loads(Path('common-engine.lock.json').read_text())
-          assert release['productVersion']=='3.5.9'
+          assert release['productVersion']=='3.6.0'
           assert release['persistenceSchemaVersion']==3
           assert release['exportFormatVersion']==3
           assert release['indexedDbVersion']==3
@@ -89,10 +89,15 @@ jobs:
           assert method['cloze']['sentence']=='The electricity experiment will take place next week, so please review your class notes and _____.'
           assert method['cloze']['provenance']=='past-paper-derived'
           assert sum(x.get('selectionOrigin') == 'rikkyo-transfer' for x in enrichment['entities'].values()) >= 105
-          assert lock['sourceCommit']=='3e6fcb1701e721ccaf070df915446004f7f312ef'
+          assert lock['sourceCommit']=='30c883a4bab19ecdd8f1732cd6cae86de6821f4d'
+          ui_contract=Path(lock['vendoredUiContract'])
+          assert hashlib.sha256(ui_contract.read_bytes()).hexdigest()==lock['vendoredUiContractSha256']
+          assert lock['uiContractArtifactSha256']==lock['vendoredUiContractSha256']
           assert lock['hotlink'] is False
           print('v3 release tuple and Common Engine pin: PASS')
           PY
+          curl -fsSL "https://raw.githubusercontent.com/FYam8/english-vocab/30c883a4bab19ecdd8f1732cd6cae86de6821f4d/src/common-engine/session-orchestration.js" | sha256sum -c <(echo "e0510dcae081e852f9002bc5d7f8f1af3aa1af2c57e0254030eacb61d62974b6  -")
+          curl -fsSL "https://raw.githubusercontent.com/FYam8/english-vocab/30c883a4bab19ecdd8f1732cd6cae86de6821f4d/src/common-engine/learning-ui-contract.json" | sha256sum -c <(echo "927607e2fd7e8db303083f0eb347701c1d23447267ab21af28b021ef8d999c8b  -")
           node --check public/sw.js
 
       - run: pnpm run check
@@ -158,16 +163,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Wait for the v3.5.9 release on Pages
+      - name: Wait for the v3.6.0 release on Pages
         run: |
           for i in {1..30}; do
             version=$(curl -fsS "https://fyam8.github.io/rikkyo-uk-vocab/release-manifest.json?sha=${GITHUB_SHA}&attempt=${i}" | python -c 'import json,sys; print(json.load(sys.stdin).get("productVersion", ""))' || true)
-            if [ "$version" = "3.5.9" ]; then
+            if [ "$version" = "3.6.0" ]; then
               exit 0
             fi
             sleep 2
           done
-          echo "GitHub Pages did not publish v3.5.9 in time" >&2
+          echo "GitHub Pages did not publish v3.6.0 in time" >&2
           exit 1
 
       - name: Install production browser runtime

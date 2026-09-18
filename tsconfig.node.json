@@ -6,6 +6,7 @@
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "strict": true,
     "noEmit": true,
@@ -22,6 +23,8 @@
     "src/rich/diagnostic.ts",
     "src/rich/store.ts",
     "src/storage.ts",
-    "src/common-engine/session-orchestration.ts"
+    "src/common-engine/session-orchestration.ts",
+    "src/common-engine/learning-ui.ts",
+    "src/common-engine/learning-ui-contract.json"
   ]
 }

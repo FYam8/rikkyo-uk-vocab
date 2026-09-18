@@ -7,7 +7,7 @@ import { VOCABULARY_SESSION_ENGINE } from "../src/common-engine/session-orchestr
 
 describe("v3 frozen compatibility contract", () => {
   it("keeps product, persistence, export and IndexedDB versions independent", () => {
-    expect(PRODUCT_VERSION).toBe("3.5.9");
+    expect(PRODUCT_VERSION).toBe("3.6.0");
     expect(ENGINE_VERSION).toBe("common-vocab-engine/1.0.0");
     expect(PERSISTENCE_SCHEMA_VERSION).toBe(3);
     expect(EXPORT_FORMAT_VERSION).toBe(3);
@@ -20,6 +20,7 @@ describe("v3 frozen compatibility contract", () => {
     expect(COMMON_ENGINE_PIN.commit).toHaveLength(40);
     expect(COMMON_ENGINE_PIN.repository).toBe("FYam8/english-vocab");
     expect(COMMON_ENGINE_PIN.vendoredModule).toContain("common-engine");
+    expect(COMMON_ENGINE_PIN.uiContractSha256).toHaveLength(64);
     expect(VOCABULARY_SESSION_ENGINE.take([1, 2, 3], 2)).toEqual([1, 2]);
   });
 

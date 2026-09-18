@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ?
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.5.9", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -133,6 +133,8 @@ describe("adaptive Phase 22 planner", () => {
     expect(q).toHaveLength(24);
     expect(q.filter((x) => x.skillKey === "meaningRecognition")).toHaveLength(16);
     expect(q.filter((x) => x.skillKey === "formProduction")).toHaveLength(8);
+    expect(q.filter((x) => x.skillKey === "meaningRecognition").every((x) => x.kind === "meaningChoice" && x.choices.length === 4)).toBe(true);
+    expect(q.filter((x) => x.skillKey === "formProduction").every((x) => x.kind === "input" && x.choices.length === 0)).toBe(true);
     expect(new Set(q.map((x) => x.questionInstanceId)).size).toBe(24);
   });
 
@@ -234,6 +236,25 @@ describe("adaptive Phase 22 planner", () => {
     expect(refreshed.choices).toHaveLength(4);
     expect(refreshed.answer).toBe(e.senses[0]?.glossJa);
     expect(refreshed.context).toBeUndefined();
+  });
+
+  it("keeps a resumed diagnostic production question as text input", () => {
+    const b = bundle();
+    const e = b.core[0]!;
+    const old: QuestionRun = {
+      questionInstanceId: "diagnostic-production",
+      stableId: e.stableId,
+      skillKey: "formProduction",
+      lane: "acquisition",
+      prompt: "old prompt",
+      choices: [],
+      answer: "old answer",
+    };
+    const refreshed = refreshStoredQuestion(b, old, "diagnostic");
+    expect(refreshed.kind).toBe("input");
+    expect(refreshed.prompt).toBe(e.senses[0]?.glossJa);
+    expect(refreshed.choices).toEqual([]);
+    expect(refreshed.answer).toBe(e.lemma);
   });
 
   it("removes duplicate unanswered base and retry questions while preserving the answered prefix", () => {

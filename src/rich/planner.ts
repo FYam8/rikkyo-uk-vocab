@@ -235,7 +235,7 @@ export function makeQuestion(bundle: RuntimeBundle, item: PlannedItem, options: 
 }
 
 /** Rehydrates a persisted, unanswered question from the current corpus without changing its identity. */
-export function refreshStoredQuestion(bundle: RuntimeBundle, question: QuestionRun): QuestionRun {
+export function refreshStoredQuestion(bundle: RuntimeBundle, question: QuestionRun, mode: "study" | "diagnostic" = "study"): QuestionRun {
   const entity = bundle.core.find((item) => item.stableId === question.stableId);
   if (!entity) return question;
   const { context: _oldContext, sourceLabel: _oldSourceLabel, ...base } = question;
@@ -251,6 +251,9 @@ export function refreshStoredQuestion(bundle: RuntimeBundle, question: QuestionR
     .sort((a, b) => stableNumber(`${question.questionInstanceId}:${a}`) - stableNumber(`${question.questionInstanceId}:${b}`));
 
   if (question.lane === "acquisition") {
+    if (mode === "diagnostic" && question.skillKey === "formProduction") {
+      return withSource({ ...base, kind: "input", prompt: meaning, choices: [], answer: entity.lemma });
+    }
     return question.skillKey === "meaningRecognition"
       ? withSource({ ...base, kind: "meaningChoice", prompt: entity.lemma, choices: meaningChoices(), answer: meaning })
       : withSource({ ...base, kind: "reverseChoice", prompt: meaning, choices: lemmaChoices(), answer: entity.lemma });

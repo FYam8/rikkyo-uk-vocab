@@ -251,7 +251,11 @@ async function renderQuestion() {
   }
   const q = session.queue[session.index]!;
   const e = entity(q.stableId);
-  root.innerHTML = questionView(q, e, session.index, session.queue.length, session.mode, { correct: session.correct, wrong: session.wrong, baseTotal: session.baseTotal }, session.feedback);
+  const answeredPrefix = session.queue.slice(0, session.index);
+  const baseBefore = answeredPrefix.filter((question) => !question.isRetry).length;
+  const baseAnswered = baseBefore + (session.feedback && !q.isRetry ? 1 : 0);
+  const basePosition = Math.min(session.baseTotal, baseBefore + (q.isRetry ? 0 : 1));
+  root.innerHTML = questionView(q, e, session.mode, { correct: session.correct, wrong: session.wrong, basePosition, baseAnswered, baseTotal: session.baseTotal, retryAnswered: session.retryAnswered }, session.feedback);
   document.querySelector("#speak-word")?.addEventListener("click", () => speak(e.lemma));
   document.querySelector("#audio-fallback")?.addEventListener("click", () => void (async () => {
     if (!session || !await ensureWritable()) return;
@@ -469,7 +473,7 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     await clearActiveSession(ctx.db, ctx.writer, "completed-recovered");
     return;
   }
-  const refreshedQueue = stored.queue.map((question, index) => index < resumeIndex ? question : refreshStoredQuestion(ctx!.bundle, question));
+  const refreshedQueue = stored.queue.map((question, index) => index < resumeIndex ? question : refreshStoredQuestion(ctx!.bundle, question, stored.mode));
   const dedupedQueue = dedupeStoredQuestionQueue(refreshedQueue, resumeIndex);
   const diagnosticEvents = initialEvents.filter((e) => e.type === "DiagnosticAnswer" && e.payload.sessionId === stored.sessionId);
   session = {
