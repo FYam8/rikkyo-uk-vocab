@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.6.1" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.6.2" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -224,6 +224,57 @@ try {
   if (challengeRun.count !== 10 || challengeRun.unique !== 10 || !challengeRun.allChallenge || !challengeRun.allFourChoice) throw new Error(`closed-cap Challenge focus mismatch: ${JSON.stringify(challengeRun)}`);
   await challengeContext.close();
 
+  const cadenceContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const cadencePage = await cadenceContext.newPage();
+  await cadencePage.goto(baseURL, { waitUntil: "networkidle" });
+  await cadencePage.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await cadencePage.locator("#session-size").selectOption("10");
+  await cadencePage.locator("#study-mode").selectOption("recommended");
+  await cadencePage.getByRole("button", { name: "学習を始める" }).click();
+  await cadencePage.locator(".rich-choice").first().waitFor();
+  const cadenceQuestion = await cadencePage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const get = request.result.transaction("sessions", "readonly").objectStore("sessions").get("active-session");
+      get.onsuccess = () => resolve(get.result?.queue?.[0] ?? null);
+      get.onerror = () => reject(get.error);
+    };
+  }));
+  if (!cadenceQuestion) throw new Error("cadence question missing");
+  await cadencePage.getByRole("button", { name: cadenceQuestion.answer, exact: true }).click();
+  await cadencePage.getByRole("button", { name: "次へ", exact: true }).waitFor();
+  const cadenceState = await cadencePage.evaluate(async (question) => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(["memory", "plans"], "readonly");
+      const memory = tx.objectStore("memory").get(`skill:${question.stableId}:${question.skillKey}`);
+      const plans = tx.objectStore("plans").getAll();
+      tx.oncomplete = () => resolve({ memory: memory.result, plan: plans.result.at(-1) });
+      tx.onerror = () => reject(tx.error);
+    };
+  }), cadenceQuestion);
+  const cooldown = Date.parse(cadenceState.memory?.dueAt ?? "") - Date.parse(cadenceState.memory?.lastSeenAt ?? "");
+  const cadenceToken = `skill:${cadenceQuestion.stableId}:${cadenceQuestion.skillKey}`;
+  if (cooldown !== 24 * 60 * 60_000 || !cadenceState.plan?.introducedStableIds?.includes(cadenceQuestion.stableId) || !cadenceState.plan?.introducedSkillKeys?.includes(cadenceToken) || cadenceState.plan?.acquisitionUsed !== 1) throw new Error(`cadence persistence mismatch: ${JSON.stringify({ cooldown, plan: cadenceState.plan })}`);
+  await cadencePage.locator("#stop-session").click();
+  await cadencePage.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await cadencePage.getByRole("button", { name: "学習を始める" }).click();
+  await cadencePage.locator(".rich-choice").first().waitFor();
+  const nextCadenceIds = await cadencePage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const get = request.result.transaction("sessions", "readonly").objectStore("sessions").get("active-session");
+      get.onsuccess = () => resolve((get.result?.queue ?? []).filter((question) => !question.isRetry).map((question) => question.stableId));
+      get.onerror = () => reject(get.error);
+    };
+  }));
+  if (nextCadenceIds.includes(cadenceQuestion.stableId)) throw new Error("same word was reintroduced in the opposite direction on the same day");
+  await cadenceContext.close();
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflow) throw new Error("mobile horizontal overflow");
   if (await page.locator("#schedule-filter").count()) throw new Error("A/B schedule output filter must not be shown");
@@ -414,7 +465,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.6.1 shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.6.2 next-day correct-answer cooldown, 10-minute miss cooldown, same-day cross-direction suppression, shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

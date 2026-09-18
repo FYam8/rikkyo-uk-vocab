@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeBundle, RuntimeEntity } from "../src/runtime";
 import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, recordAcquisition, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
 import type { QuestionRun, SkillState } from "../src/rich/types";
 
 function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ? "Challenge" : i % 2 ? "Foundation" : "Core"): RuntimeEntity {
@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ?
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.1", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.2", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -112,12 +112,39 @@ describe("adaptive Phase 22 planner", () => {
     const again = applyStudyAnswer(initial, "Again", start);
     expect(again.stage).toBe("learning");
     expect(again.card).toBeNull();
+    expect(again.dueAt).toBe("2026-09-14T12:10:00.000Z");
     const good1 = applyStudyAnswer(again, "Good", start);
     expect(good1.stage).toBe("learning");
     expect(good1.card).toBeNull();
-    const good2 = applyStudyAnswer(good1, "Good", new Date(start.getTime() + 10 * 60_000));
+    expect(good1.dueAt).toBe("2026-09-15T12:00:00.000Z");
+    const good2 = applyStudyAnswer(good1, "Good", new Date(start.getTime() + 24 * 60 * 60_000));
     expect(good2.stage).toBe("review");
     expect(good2.card).not.toBeNull();
+  });
+
+  it("waits until the next day after a correct first answer", () => {
+    const start = new Date("2026-09-14T12:00:00Z");
+    const b = bundle();
+    const e = b.core[0]!;
+    const next = applyStudyAnswer(createInitialState("g1", e.stableId, "meaningRecognition", start), "Good", start);
+    const plan = { ...ensurePlan("g1", 1200, undefined, "Europe/London", start), acquisitionClosed: true };
+    expect(next.dueAt).toBe("2026-09-15T12:00:00.000Z");
+    expect(buildQueue(b, [next], plan, new Date(start.getTime() + 10 * 60_000), 10)).toHaveLength(0);
+    expect(buildQueue(b, [next], plan, new Date(start.getTime() + 24 * 60 * 60_000), 10)).toHaveLength(1);
+  });
+
+  it("does not introduce the other direction for the same word on the same day", () => {
+    const now = new Date("2026-09-14T12:00:00Z");
+    const b = bundle();
+    const e = b.core[0]!;
+    const base = ensurePlan("g1", 1200, undefined, "Europe/London", now);
+    const plan = recordAcquisition(base, e.stableId, "meaningRecognition");
+    const meaning = applyStudyAnswer(createInitialState("g1", e.stableId, "meaningRecognition", now), "Good", now);
+    const queue = buildQueue(b, [meaning], plan, now, 32);
+    expect(queue.some((item) => item.entity.stableId === e.stableId)).toBe(false);
+    expect(plan.introducedSkillKeys).toEqual([stateKey(e.stableId, "meaningRecognition")]);
+    expect(plan.acquisitionUsed).toBe(1);
+    expect(recordAcquisition(plan, e.stableId, "meaningRecognition").acquisitionUsed).toBe(1);
   });
 
   it("returns failed provisional confirmation to acquisition candidate rather than lapse", () => {

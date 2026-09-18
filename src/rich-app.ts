@@ -3,7 +3,7 @@ import "./rich/styles.css";
 import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./runtime";
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, refreshStoredQuestion, retryGap, stateKey } from "./rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, recordAcquisition, refreshStoredQuestion, retryGap, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, discardInvalidActiveSession, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, repairStartupTransientState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
 import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
@@ -331,9 +331,8 @@ async function answer(given: string) {
     await saveSkillAndEvent(ctx.db, ctx.writer, next, "AnswerCommitted", reviewPayload);
     let plan = s.plan;
     const seconds = Math.max(1, Math.min(90, Math.round((Date.now() - session.shownAt) / 1000)));
-    const introduced = new Set(plan.introducedStableIds);
-    if (q.lane === "acquisition") introduced.add(q.stableId);
-    plan = { ...plan, introducedStableIds: [...introduced], activeStudySeconds: (plan.activeStudySeconds ?? 0) + seconds };
+    if (q.lane === "acquisition") plan = recordAcquisition(plan, q.stableId, q.skillKey);
+    plan = { ...plan, activeStudySeconds: (plan.activeStudySeconds ?? 0) + seconds };
     if ((plan.activeStudySeconds ?? 0) >= plan.targetSeconds) plan.acquisitionClosed = true;
     await savePlan(ctx.db, ctx.writer, plan);
   }

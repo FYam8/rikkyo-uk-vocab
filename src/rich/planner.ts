@@ -5,8 +5,11 @@ import type { DailyPlanRecord, Lane, QuestionKind, QuestionRun, ScheduleFilter, 
 import { VOCABULARY_SESSION_ENGINE } from "../common-engine/session-orchestration";
 
 const MINUTE = 60_000;
-const LEARNING_STEPS = [1 * MINUTE, 10 * MINUTE];
-const RELEARNING_STEPS = [1 * MINUTE, 10 * MINUTE];
+const DAY = 24 * 60 * MINUTE;
+// A miss still gets one in-session retry. Outside that session, only missed
+// material may return after 10 minutes; a correct answer waits until tomorrow.
+const LEARNING_STEPS = [10 * MINUTE, DAY];
+const RELEARNING_STEPS = [10 * MINUTE, DAY];
 
 export function stateKey(stableId: string, skillKey: SkillKey): string { return `skill:${stableId}:${skillKey}`; }
 export function learningDayId(at = new Date(), timeZone = "Europe/London"): string {
@@ -46,6 +49,21 @@ export function ensurePlan(generationId: string, targetSeconds: number, existing
     acquisitionClosed: false,
     activeStudySeconds: 0,
     lastAppliedRevision: 0,
+  };
+}
+
+export function recordAcquisition(plan: DailyPlanRecord, stableId: string, skillKey: SkillKey): DailyPlanRecord {
+  const introduced = new Set(plan.introducedStableIds);
+  const introducedSkills = new Set(plan.introducedSkillKeys ?? []);
+  const skillToken = stateKey(stableId, skillKey);
+  const isNewSkill = !introducedSkills.has(skillToken);
+  introduced.add(stableId);
+  introducedSkills.add(skillToken);
+  return {
+    ...plan,
+    introducedStableIds: [...introduced],
+    introducedSkillKeys: [...introducedSkills],
+    acquisitionUsed: (plan.acquisitionUsed ?? 0) + (isNewSkill ? 1 : 0),
   };
 }
 
@@ -105,7 +123,7 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
     let remainingBudget = explicitBandFocus ? limit - items.length : Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
     const queuedIds = new Set(items.map((item) => item.entity.stableId));
     const candidates = bundle.core
-      .filter((e) => !queuedIds.has(e.stableId) && matchesEntity(e, mode) && skillsFor(e).some((s) => {
+      .filter((e) => !queuedIds.has(e.stableId) && !introduced.has(e.stableId) && matchesEntity(e, mode) && skillsFor(e).some((s) => {
         const existing = byKey.get(stateKey(e.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";
       }))
