@@ -1,4 +1,6 @@
 import contract from "./learning-ui-contract.json";
+import "./learning-ui-runtime.js";
+import type { ProgressInput } from "./learning-ui-runtime.js";
 
 export type CommonQuestionKind = keyof typeof contract.questionKinds;
 
@@ -16,29 +18,8 @@ export function questionCopy(kind: CommonQuestionKind): { label: string; instruc
   return contract.questionKinds[kind];
 }
 
-export function sessionProgress(input: {
-  mode: "study" | "diagnostic";
-  isRetry: boolean;
-  basePosition: number;
-  baseAnswered: number;
-  baseTotal: number;
-  retryAnswered: number;
-  answeredCurrent: boolean;
-}): { primary: string; secondary: string } {
-  const currentRetry = input.isRetry && !input.answeredCurrent ? 1 : 0;
-  if (input.mode === "diagnostic") {
-    return { primary: "診断", secondary: `${input.basePosition}/${input.baseTotal}` };
-  }
-  if (input.isRetry) {
-    return {
-      primary: contract.sessionProgress.retryLabel,
-      secondary: `${contract.sessionProgress.baseLabel} ${input.baseAnswered}/${input.baseTotal} ・ ${contract.sessionProgress.retryLabel} ${input.retryAnswered + currentRetry}`,
-    };
-  }
-  return {
-    primary: `問題 ${input.basePosition} / ${input.baseTotal}`,
-    secondary: `${contract.sessionProgress.baseLabel} ${input.basePosition}/${input.baseTotal}${input.retryAnswered ? ` ・ ${contract.sessionProgress.retryLabel} ${input.retryAnswered}` : ""}`,
-  };
+export function sessionProgress(input: ProgressInput): { primary: string; secondary: string } {
+  return globalThis.VocabularyLearningUI.progress(input, contract.sessionProgress);
 }
 
 export const LEARNING_UI_CONTRACT_VERSION = contract.version;
