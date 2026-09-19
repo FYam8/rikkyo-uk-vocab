@@ -91,7 +91,7 @@ function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
 }
 export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: DailyPlanRecord, now = new Date(), limit = 60, options: StudyOptions = {}): PlannedItem[] {
   const mode = options.mode ?? "recommended";
-  const explicitBandFocus = options.additionalNew === true || mode === "foundation" || mode === "core" || mode === "challenge";
+  const explicitBandFocus = options.additionalNew === true || mode === "recommended" || mode === "foundation" || mode === "core" || mode === "challenge";
   const byKey = new Map(memory.map((x) => [x.key, x]));
   const nowMs = now.getTime();
   const items: PlannedItem[] = [];
@@ -111,9 +111,8 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
   items.length = 0;
   items.push(...uniqueItems);
 
-  // The daily acquisition cap governs automatic study. An explicitly selected
-  // band is intentional extra study, so it must not become an empty session
-  // merely because today's automatic introduction budget has been consumed.
+  // Recommended and focused study remain available beyond the daily target.
+  // Due work stays first; per-word introduction/cooldown guards still apply.
   if ((!plan.acquisitionClosed || explicitBandFocus) && items.length < limit && mode !== "weak" && mode !== "review") {
     const introduced = new Set(plan.introducedStableIds);
     const introducedSkills = new Set(plan.introducedSkillKeys ?? []);
@@ -124,6 +123,7 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
     let remainingBudget = explicitBandFocus ? limit - items.length : Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
     const queuedIds = new Set(items.map((item) => item.entity.stableId));
     const candidates = bundle.core
+      .filter((e) => !memory.some((s) => s.stableId === e.stableId && s.lastSeenAt && nowMs - Date.parse(s.lastSeenAt) < DAY))
       .filter((e) => !options.additionalNew || !memory.some((s) => s.stableId === e.stableId))
       .filter((e) => !queuedIds.has(e.stableId) && !introduced.has(e.stableId) && matchesEntity(e, mode) && skillsFor(e).some((s) => {
         const existing = byKey.get(stateKey(e.stableId, s));

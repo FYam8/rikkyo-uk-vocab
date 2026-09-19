@@ -232,7 +232,7 @@ async function startStudy(additionalNew = false) {
     const heading = document.createElement("h2");
     heading.textContent = studyMode === "recommended" ? "今のおすすめ学習は完了です" : "このモードで今出題できる問題はありません";
     const message = document.createElement("p");
-    message.textContent = "日次の新規導入上限や復習の待機時間を考慮しています。問題数の指定では日次上限は変わりません。" + (nextDue ? " 次の復習予定：" + new Date(nextDue).toLocaleString("ja-JP", { timeZone: s.preferences.learningTimeZone }) : " 現在、次の復習予定はありません。");
+    message.textContent = (studyMode === "recommended" ? "今出題できる語はありません。同じ語の短時間反復を避け、復習の待機時間を守っています。" : "このモードの対象語・日次の導入条件・復習の待機時間を考慮しています。") + (nextDue ? " 次の復習予定：" + new Date(nextDue).toLocaleString("ja-JP", { timeZone: s.preferences.learningTimeZone }) : " 現在、次の復習予定はありません。");
     notice.append(heading, message);
     if (extra.length) {
       const button = document.createElement("button");

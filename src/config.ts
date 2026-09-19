@@ -1,5 +1,5 @@
 export const APP_ID = "rikkyo-uk-vocab" as const;
-export const PRODUCT_VERSION = "3.6.3" as const;
+export const PRODUCT_VERSION = "3.6.4" as const;
 export const ENGINE_VERSION = "common-vocab-engine/1.0.0" as const;
 export const DATASET_VERSION = "0.24.0-lexical" as const;
 export const PERSISTENCE_SCHEMA_VERSION = 3 as const;

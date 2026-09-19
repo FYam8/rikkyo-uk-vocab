@@ -9,7 +9,7 @@ try {
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.6.3" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.6.4" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -201,9 +201,8 @@ try {
   await challengePage.locator("#study-mode").selectOption("recommended");
   await challengePage.locator("#session-size").selectOption("50");
   await challengePage.getByRole("button", { name: "学習を始める" }).click();
-  await challengePage.getByText("今のおすすめ学習は完了です", { exact: true }).waitFor();
-  await challengePage.locator("#additional-new-study").click();
   await challengePage.locator(".rich-choice").first().waitFor();
+  await challengePage.locator(".sessionbar b").getByText("問題 1 / 50", { exact: true }).waitFor();
   await challengePage.locator("#stop-session").click();
   await challengePage.getByRole("heading", { name: "学習", exact: true }).waitFor();
   await challengePage.locator("#study-mode").selectOption("challenge");
@@ -475,7 +474,7 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.6.3 next-day correct-answer cooldown, 10-minute miss cooldown, same-day cross-direction suppression, shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
+  console.log(`${pass}: v3.6.4 next-day correct-answer cooldown, 10-minute miss cooldown, same-day cross-direction suppression, shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

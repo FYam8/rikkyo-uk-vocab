@@ -1,6 +1,6 @@
 {
   "appId": "rikkyo-uk-vocab",
-  "productVersion": "3.6.3",
+  "productVersion": "3.6.4",
   "engineVersion": "common-vocab-engine/1.0.0",
   "datasetVersion": "0.24.0-lexical",
   "persistenceSchemaVersion": 3,

@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ?
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.3", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.4", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -38,11 +38,28 @@ function bundle(): RuntimeBundle {
 }
 
 describe("adaptive Phase 22 planner", () => {
+  it("recommends remaining Challenge words after the daily cap and keeps due work first", () => {
+    const b = bundle(), now = new Date("2026-09-19T12:00:00Z");
+    b.core = b.core.filter(e => e.targetBand === "Challenge");
+    const due = createInitialState("g1", b.core[0]!.stableId, "meaningRecognition", now);
+    const plan = { ...ensurePlan("g1", 1200, undefined, "Europe/London", now), acquisitionClosed: true, acquisitionUsed: 12 };
+    const queue = buildQueue(b, [due], plan, now, 50);
+    expect(queue).toHaveLength(b.core.length);
+    expect(queue[0]!.lane).toBe("learning");
+    expect(new Set(queue.map(x => x.entity.stableId)).size).toBe(queue.length);
+  });
+
+  it("does not introduce another direction within 24 hours even across midnight", () => {
+    const b = bundle(), now = new Date("2026-09-20T00:30:00Z");
+    const prev = applyStudyAnswer(createInitialState("g1", b.core[0]!.stableId, "meaningRecognition"), "Good", new Date("2026-09-19T22:30:00Z"));
+    const queue = buildQueue(b, [prev], ensurePlan("g1", 1200, undefined, "Europe/London", now), now, 50);
+    expect(queue.some(x => x.entity.stableId === prev.stableId)).toBe(false);
+  });
   it("allows explicit additional unseen words after the recommended budget closes", () => {
     const b = bundle(), now = new Date("2026-09-19T12:00:00Z");
     const memory = [applyStudyAnswer(createInitialState("g1", b.core[0]!.stableId, "meaningRecognition", now), "Good", now)];
     const plan = { ...ensurePlan("g1", 1200, undefined, "Europe/London", now), acquisitionClosed: true, acquisitionUsed: 12, introducedStableIds: b.core.slice(0, 12).map(e => e.stableId) };
-    expect(buildQueue(b, memory, plan, now, 50)).toHaveLength(0);
+    expect(buildQueue(b, memory, plan, now, 50)).toHaveLength(20);
     const extra = buildQueue(b, memory, plan, now, 50, { additionalNew: true });
     expect(extra).toHaveLength(20);
     expect(extra.every(x => x.lane === "acquisition" && x.skillKey === "meaningRecognition")).toBe(true);
@@ -93,10 +110,10 @@ describe("adaptive Phase 22 planner", () => {
     expect(new Set(queue.map((item) => item.entity.stableId)).size).toBe(queue.length);
   });
 
-  it("does not add acquisition when the daily acquisition lane is closed", () => {
+  it("continues recommended acquisition when the daily target is reached", () => {
     const b = bundle();
     const plan = { ...ensurePlan("g1", 1200), acquisitionClosed: true };
-    expect(buildQueue(b, [], plan, new Date(), 10)).toHaveLength(0);
+    expect(buildQueue(b, [], plan, new Date(), 10)).toHaveLength(10);
   });
 
   it("keeps an explicitly selected Challenge session available after the daily cap closes", () => {
@@ -140,8 +157,8 @@ describe("adaptive Phase 22 planner", () => {
     const next = applyStudyAnswer(createInitialState("g1", e.stableId, "meaningRecognition", start), "Good", start);
     const plan = { ...ensurePlan("g1", 1200, undefined, "Europe/London", start), acquisitionClosed: true };
     expect(next.dueAt).toBe("2026-09-15T12:00:00.000Z");
-    expect(buildQueue(b, [next], plan, new Date(start.getTime() + 10 * 60_000), 10)).toHaveLength(0);
-    expect(buildQueue(b, [next], plan, new Date(start.getTime() + 24 * 60 * 60_000), 10)).toHaveLength(1);
+    expect(buildQueue(b, [next], plan, new Date(start.getTime() + 10 * 60_000), 10, { mode: "review" })).toHaveLength(0);
+    expect(buildQueue(b, [next], plan, new Date(start.getTime() + 24 * 60 * 60_000), 10, { mode: "review" })).toHaveLength(1);
   });
 
   it("does not introduce the other direction for the same word on the same day", () => {
