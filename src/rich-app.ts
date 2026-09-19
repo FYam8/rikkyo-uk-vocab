@@ -212,14 +212,44 @@ async function renderRoute() {
   return renderHome();
 }
 
-async function startStudy() {
+async function startStudy(additionalNew = false) {
   if (!await ensureWritable() || !ctx) return;
   const s = await state();
   const plan = effectivePlan(s.plan, s.preferences, s.memory);
   const requested = s.preferences.sessionSize ?? 20;
   const studyMode = s.preferences.studyMode ?? "recommended";
-  const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), requested === 0 ? 60 : requested, { mode: studyMode });
-  if (!items.length) return alert("現在出題できる項目はありません。");
+  const limit = requested === 0 ? 60 : requested;
+  const items = buildQueue(ctx.bundle, s.memory, plan, new Date(), limit, { mode: additionalNew ? "recommended" : studyMode, additionalNew });
+  if (!items.length) {
+    await renderHome();
+    const extra = buildQueue(ctx.bundle, s.memory, plan, new Date(), limit, { mode: "recommended", additionalNew: true });
+    const nextDue = s.memory.filter((m) => ctx!.bundle.core.some((e) => e.stableId === m.stableId) && ["learning", "relearning", "review", "provisional"].includes(m.stage))
+      .map((m) => Date.parse(m.dueAt)).filter((at) => at > Date.now()).sort((a, b) => a - b)[0];
+    const notice = document.createElement("section");
+    notice.className = "ios-card notice";
+    notice.setAttribute("role", "status");
+    notice.id = "study-availability";
+    const heading = document.createElement("h2");
+    heading.textContent = studyMode === "recommended" ? "今のおすすめ学習は完了です" : "このモードで今出題できる問題はありません";
+    const message = document.createElement("p");
+    message.textContent = "日次の新規導入上限や復習の待機時間を考慮しています。問題数の指定では日次上限は変わりません。" + (nextDue ? " 次の復習予定：" + new Date(nextDue).toLocaleString("ja-JP", { timeZone: s.preferences.learningTimeZone }) : " 現在、次の復習予定はありません。");
+    notice.append(heading, message);
+    if (extra.length) {
+      const button = document.createElement("button");
+      button.className = "primary";
+      button.id = "additional-new-study";
+      button.textContent = `未学習語を追加で学ぶ（${extra.length}問）`;
+      button.addEventListener("click", () => void startStudy(true));
+      notice.append(button);
+    } else {
+      const message = document.createElement("p");
+      message.textContent = "追加できる未学習語はありません。単語一覧で確認できます。";
+      notice.append(message);
+    }
+    root.querySelector("main")?.prepend(notice);
+    notice.scrollIntoView({ block: "start" });
+    return;
+  }
   const now = new Date().toISOString();
   const allowAudio = audioQuestionsEnabled(s.preferences);
   session = { generationId: s.generation.generationId, sessionId: crypto.randomUUID(), startedAt: now, mode: "study", queue: items.map((x) => makeQuestion(ctx!.bundle, x, { allowAudio, intensity: studyMode === "exam" ? "exam" : "adaptive" })), index: 0, shownAt: Date.now(), diagnostics: [], baseTotal: items.length, correct: 0, wrong: 0, retryAnswered: 0, missedStableIds: new Set() };

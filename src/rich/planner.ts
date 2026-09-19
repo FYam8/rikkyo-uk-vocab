@@ -69,7 +69,7 @@ export function recordAcquisition(plan: DailyPlanRecord, stableId: string, skill
 
 export interface PlannedItem { entity: RuntimeEntity; skillKey: SkillKey; lane: Lane; state?: SkillState; }
 export interface QuestionOptions { allowAudio?: boolean; intensity?: "adaptive" | "exam"; }
-export interface StudyOptions { mode?: StudyMode; schedule?: ScheduleFilter; }
+export interface StudyOptions { mode?: StudyMode; schedule?: ScheduleFilter; additionalNew?: boolean; }
 function skillStrength(item: PlannedItem): number {
   return (item.state?.correct ?? 0) - (item.state?.wrong ?? 0);
 }
@@ -91,11 +91,12 @@ function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
 }
 export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: DailyPlanRecord, now = new Date(), limit = 60, options: StudyOptions = {}): PlannedItem[] {
   const mode = options.mode ?? "recommended";
-  const explicitBandFocus = mode === "foundation" || mode === "core" || mode === "challenge";
+  const explicitBandFocus = options.additionalNew === true || mode === "foundation" || mode === "core" || mode === "challenge";
   const byKey = new Map(memory.map((x) => [x.key, x]));
   const nowMs = now.getTime();
   const items: PlannedItem[] = [];
   for (const entity of bundle.core.filter((x) => matchesEntity(x, mode))) for (const skillKey of skillsFor(entity)) {
+    if (options.additionalNew) continue;
     const state = byKey.get(stateKey(entity.stableId, skillKey));
     if (mode === "unlearned") continue;
     if (mode === "weak" && !(state && state.wrong > state.correct)) continue;
@@ -123,6 +124,7 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
     let remainingBudget = explicitBandFocus ? limit - items.length : Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
     const queuedIds = new Set(items.map((item) => item.entity.stableId));
     const candidates = bundle.core
+      .filter((e) => !options.additionalNew || !memory.some((s) => s.stableId === e.stableId))
       .filter((e) => !queuedIds.has(e.stableId) && !introduced.has(e.stableId) && matchesEntity(e, mode) && skillsFor(e).some((s) => {
         const existing = byKey.get(stateKey(e.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";

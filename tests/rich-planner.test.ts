@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ?
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.2", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.3", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -38,6 +38,17 @@ function bundle(): RuntimeBundle {
 }
 
 describe("adaptive Phase 22 planner", () => {
+  it("allows explicit additional unseen words after the recommended budget closes", () => {
+    const b = bundle(), now = new Date("2026-09-19T12:00:00Z");
+    const memory = [applyStudyAnswer(createInitialState("g1", b.core[0]!.stableId, "meaningRecognition", now), "Good", now)];
+    const plan = { ...ensurePlan("g1", 1200, undefined, "Europe/London", now), acquisitionClosed: true, acquisitionUsed: 12, introducedStableIds: b.core.slice(0, 12).map(e => e.stableId) };
+    expect(buildQueue(b, memory, plan, now, 50)).toHaveLength(0);
+    const extra = buildQueue(b, memory, plan, now, 50, { additionalNew: true });
+    expect(extra).toHaveLength(20);
+    expect(extra.every(x => x.lane === "acquisition" && x.skillKey === "meaningRecognition")).toBe(true);
+    expect(extra.some(x => x.entity.stableId === memory[0]!.stableId)).toBe(false);
+    expect(buildQueue(b, b.core.map(e => createInitialState("g1", e.stableId, "meaningRecognition", now)), plan, now, 50, { additionalNew: true })).toHaveLength(0);
+  });
   it("uses the configured learning timezone for the day boundary", () => {
     const at = new Date("2026-01-01T00:30:00Z");
     expect(learningDayId(at, "America/New_York")).toBe("2025-12-31");
