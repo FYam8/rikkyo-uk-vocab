@@ -1,5 +1,5 @@
 export const APP_ID = "rikkyo-uk-vocab" as const;
-export const PRODUCT_VERSION = "3.6.4" as const;
+export const PRODUCT_VERSION = "3.7.0" as const;
 export const ENGINE_VERSION = "common-vocab-engine/1.0.0" as const;
 export const DATASET_VERSION = "0.24.0-lexical" as const;
 export const PERSISTENCE_SCHEMA_VERSION = 3 as const;
@@ -28,7 +28,7 @@ export const COMMON_ENGINE_PIN = Object.freeze({
   commit: "6f4788386a1935d6e2703c694257c1f327b0f831",
   artifact: "src/common-engine/session-orchestration.js",
   artifactSha256: "e0510dcae081e852f9002bc5d7f8f1af3aa1af2c57e0254030eacb61d62974b6",
-  vendoredModule: "src/common-engine/session-orchestration.ts",
+  vendoredModule: "src/common-engine/waseda-session.js",
   uiContractArtifact: "src/common-engine/learning-ui-contract.json",
   uiContractSha256: "927607e2fd7e8db303083f0eb347701c1d23447267ab21af28b021ef8d999c8b",
   vendoredUiContract: "src/common-engine/learning-ui-contract.json",

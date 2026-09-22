@@ -5,6 +5,18 @@ import contract from "../src/common-engine/learning-ui-contract.json";
 import { questionCopy, resolveQuestionKind, sessionProgress } from "../src/common-engine/learning-ui";
 
 describe("Waseda-derived common learning UI contract", () => {
+  it("pins the actual Waseda planner, selection functions and visual stylesheet", () => {
+    const lock = JSON.parse(readFileSync(new URL("../common-engine.lock.json", import.meta.url), "utf8"));
+    const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+    const hash = (text: string) => createHash("sha256").update(text).digest("hex");
+    const module = read(lock.vendoredModule);
+    expect(module.endsWith(lock.moduleExportSuffix)).toBe(true);
+    expect(hash(module.slice(0, -lock.moduleExportSuffix.length))).toBe(lock.sourceArtifactSha256);
+    expect(hash(read(lock.vendoredShellCss))).toBe(lock.shellCssSha256);
+    expect(hash(read(lock.vendoredSelection))).toBe(lock.selectionSha256);
+    expect(read("src/rich-app.ts")).toContain('import "./common-engine/waseda-shell.css"');
+    expect(read("src/rich/planner.ts")).toContain("VOCABULARY_SESSION_ENGINE.buildPlan");
+  });
   it("uses the exact Waseda runtime pinned in the lock file", () => {
     const lock = JSON.parse(readFileSync(new URL("../common-engine.lock.json", import.meta.url), "utf8"));
     const source = readFileSync(new URL("../src/common-engine/learning-ui-runtime.js", import.meta.url));

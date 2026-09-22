@@ -1,15 +1,21 @@
 import { chromium } from "playwright";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir } from "node:fs/promises";
 
 const baseURL = process.env.QA_BASE_URL ?? "http://127.0.0.1:4173/rikkyo-uk-vocab/";
 const pass = process.env.QA_PASS ?? "QA";
+async function screenshot(page, name) {
+  if (!process.env.QA_SCREENSHOT_DIR) return;
+  await mkdir(process.env.QA_SCREENSHOT_DIR, { recursive: true });
+  await page.screenshot({ path: `${process.env.QA_SCREENSHOT_DIR}/${name}.png`, fullPage: true });
+}
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto(baseURL, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "学習", exact: true }).waitFor();
+  await screenshot(page, "home");
   const tuple = await page.evaluate(async () => (await fetch("./release-manifest.json", { cache: "no-store" })).json());
-  if (tuple.productVersion !== "3.6.4" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
+  if (tuple.productVersion !== "3.7.0" || tuple.persistenceSchemaVersion !== 3 || tuple.datasetVersion !== "0.24.0-lexical" || tuple.enrichmentVersion !== "2026-09-17-reselected-v4") throw new Error("release tuple mismatch");
 
   const legacyContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const legacyPage = await legacyContext.newPage();
@@ -93,6 +99,7 @@ try {
   await clozeSeed.close();
   const clozePage = await clozeContext.newPage();
   await clozePage.goto(baseURL, { waitUntil: "networkidle" });
+  await clozePage.locator("#resume-session").click();
   await clozePage.getByText("The electricity experiment will take place next week, so please review your class notes and _____.", { exact: true }).waitFor();
   await clozePage.getByText("意味：方法", { exact: true }).waitFor();
   const refreshedCloze = await clozePage.evaluate(async () => new Promise((resolve, reject) => {
@@ -115,8 +122,8 @@ try {
     };
   }));
   if (recoveredQueueSize !== 1) throw new Error(`duplicate persisted word was not removed: ${recoveredQueueSize}`);
-  await clozePage.locator(".question-flags").getByText("復習", { exact: true }).waitFor();
-  if (await clozePage.locator(".question-flags").getByText("acquisition", { exact: true }).count()) throw new Error("internal acquisition label is visible");
+  await clozePage.locator(".qmeta").getByText(/復習/).waitFor();
+  if (await clozePage.locator(".qmeta").getByText("acquisition", { exact: true }).count()) throw new Error("internal acquisition label is visible");
   await clozeContext.close();
 
   const diagnosticContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
@@ -143,7 +150,8 @@ try {
   await diagnosticSeed.close();
   const diagnosticPage = await diagnosticContext.newPage();
   await diagnosticPage.goto(baseURL, { waitUntil: "networkidle" });
-  await diagnosticPage.locator(".question-flags").getByText("日→英・入力", { exact: true }).waitFor();
+  await diagnosticPage.locator("#resume-session").click();
+  await diagnosticPage.locator(".qmeta").getByText(/日→英・入力/).waitFor();
   await diagnosticPage.getByText("対応する英語を入力してください", { exact: true }).waitFor();
   if (await diagnosticPage.locator("#answer-input").count() !== 1 || await diagnosticPage.locator(".rich-choice").count() !== 0) throw new Error("diagnostic production question is not text input");
   await diagnosticContext.close();
@@ -174,9 +182,10 @@ try {
   await retrySeed.close();
   const retryPage = await retryContext.newPage();
   await retryPage.goto(baseURL, { waitUntil: "networkidle" });
+  await retryPage.locator("#resume-session").click();
   await retryPage.locator(".sessionbar b").getByText("再確認", { exact: true }).waitFor();
   await retryPage.locator(".sessionbar small").getByText("基本 10/10 ・ 再確認 1", { exact: true }).waitFor();
-  await retryPage.locator(".question-flags").getByText(/再確認/).waitFor();
+  await retryPage.locator(".qmeta").getByText(/再確認/).waitFor();
   await retryContext.close();
 
   const challengeContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
@@ -268,6 +277,17 @@ try {
   const cooldown = Date.parse(cadenceState.memory?.dueAt ?? "") - Date.parse(cadenceState.memory?.lastSeenAt ?? "");
   const cadenceToken = `skill:${cadenceQuestion.stableId}:${cadenceQuestion.skillKey}`;
   if (cooldown !== 24 * 60 * 60_000 || !cadenceState.plan?.introducedStableIds?.includes(cadenceQuestion.stableId) || !cadenceState.plan?.introducedSkillKeys?.includes(cadenceToken) || cadenceState.plan?.acquisitionUsed !== 1) throw new Error(`cadence persistence mismatch: ${JSON.stringify({ cooldown, plan: cadenceState.plan })}`);
+  // Reproduce a legacy overdue opposite direction beside today's correct answer.
+  await cadencePage.evaluate(async (memory) => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const tx = request.result.transaction("memory", "readwrite");
+      tx.objectStore("memory").put({ ...memory, key: `skill:${memory.stableId}:formProduction`, skillKey: "formProduction", stage: "learning", stepIndex: 0, lastSeenAt: null, dueAt: new Date(Date.now() - 86400000).toISOString() });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+  }), cadenceState.memory);
   await cadencePage.locator("#stop-session").click();
   await cadencePage.getByRole("heading", { name: "学習", exact: true }).waitFor();
   await cadencePage.getByRole("button", { name: "学習を始める" }).click();
@@ -317,8 +337,9 @@ try {
   await page.locator(".sessionbar b").getByText("問題 1 / 10", { exact: true }).waitFor();
   await page.locator(".sessionbar small").getByText("基本 1/10", { exact: true }).waitFor();
   if (await page.locator(".rich-choice").count() !== 4) throw new Error("unseen exam item must start with four choices");
-  await page.locator(".question-flags").getByText("選択式・英→日", { exact: true }).waitFor();
-  await page.locator(".question-flags").getByText("新出", { exact: true }).waitFor();
+  await page.locator(".qmeta").getByText(/選択式・英→日/).waitFor();
+  await page.locator(".qmeta").getByText(/新出/).waitFor();
+  await screenshot(page, "question");
   const firstSessionIds = await page.evaluate(async () => new Promise((resolve, reject) => {
     const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
     request.onerror = () => reject(request.error);
@@ -402,6 +423,7 @@ try {
   if (!activeBeforeReload || activeBeforeReload.queue.length !== 11 || activeBeforeReload.wrong !== 1 || !activeBeforeReload.queue.some((q) => q.isRetry && q.retryOf === activeQuestion.questionInstanceId) || activeBeforeReload.queue.some((q) => q.kind === "audioChoice" || q.kind === "audioInput")) throw new Error("active session/retry/audio fallback mismatch before reload");
 
   await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#resume-session").click();
   await page.waitForTimeout(500);
   if (!(await page.locator(".study-card").isVisible())) {
     console.error("resume debug", { url: page.url(), body: (await page.locator("body").innerText()).slice(0, 1200) });
@@ -474,7 +496,39 @@ try {
     };
   }));
   if (imported.generation?.persistenceSchemaVersion !== 3 || imported.memory.length < 1 || imported.events.filter((x) => x.type === "AnswerCommitted").length !== 1 || imported.active?.resumeIndex !== 1) throw new Error("v3 import/history/session preservation mismatch");
-  console.log(`${pass}: v3.6.4 next-day correct-answer cooldown, 10-minute miss cooldown, same-day cross-direction suppression, shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
+  const finishContext = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const finishPage = await finishContext.newPage();
+  await finishPage.goto(baseURL, { waitUntil: "networkidle" });
+  await finishPage.locator("#session-size").selectOption("10");
+  await finishPage.locator("#start-study").click();
+  await finishPage.locator(".rich-choice").first().waitFor();
+  const finishQueue = await finishPage.evaluate(async () => new Promise((resolve, reject) => {
+    const request = indexedDB.open("rikkyo-uk-vocab-main-v1", 3);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const get = request.result.transaction("sessions", "readonly").objectStore("sessions").get("active-session");
+      get.onsuccess = () => resolve(get.result.queue);
+      get.onerror = () => reject(get.error);
+    };
+  }));
+  if (finishQueue.length !== 10) throw new Error("full-session fixture size mismatch");
+  for (let index = 0; index < finishQueue.length; index++) {
+    const q = finishQueue[index];
+    const answer = index === 9 ? q.choices.find(c => c !== q.answer) : q.answer;
+    await finishPage.getByRole("button", { name: answer, exact: true }).click();
+    await finishPage.locator("#next-question").waitFor();
+    if (index === 9) {
+      if (await finishPage.locator("#next-question").innerText() !== "結果を見る") throw new Error("last miss forced an immediate retry");
+      await screenshot(finishPage, "last-feedback");
+    }
+    await finishPage.locator("#next-question").click();
+  }
+  await finishPage.getByRole("heading", { name: "セッション結果", exact: true }).waitFor();
+  await screenshot(finishPage, "result");
+  await finishPage.locator("#result-home").click();
+  await finishPage.locator("#start-study").waitFor();
+  await finishContext.close();
+  console.log(`${pass}: v3.7.0 next-day correct-answer cooldown, 10-minute miss cooldown, same-day cross-direction suppression, shared Waseda UI contract, fixed base/retry progress, diagnostic input labels, direct Japanese example translations, closed-cap Challenge focus, one-word-per-session deduplication, four-choice introduction, persisted-question refresh, audited cloze corpus, Safari startup repair, stale-shell recovery, writer handoff, lexical difficulty, Challenge 60, unified A/B, dark-mode contrast, audio fallback, mobile, Resume, Export/Import and Backup CLEAN`);
 } finally {
   await browser.close();
 }

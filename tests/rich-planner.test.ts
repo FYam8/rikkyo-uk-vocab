@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RuntimeBundle, RuntimeEntity } from "../src/runtime";
 import { buildDiagnostic, provisionalFromDiagnostic } from "../src/rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, learningDayId, makeQuestion, makeRetryQuestion, recordAcquisition, refreshStoredQuestion, retryGap, stateKey } from "../src/rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, insertDueRetry, learningDayId, makeQuestion, makeRetryQuestion, recordAcquisition, refreshStoredQuestion, retryGap, spaceStoredRetries, stateKey } from "../src/rich/planner";
 import type { QuestionRun, SkillState } from "../src/rich/types";
 
 function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ? "Challenge" : i % 2 ? "Foundation" : "Core"): RuntimeEntity {
@@ -30,7 +30,7 @@ function entity(i: number, band: "Foundation" | "Core" | "Challenge" = i >= 22 ?
 function bundle(): RuntimeBundle {
   const core = Array.from({ length: 32 }, (_, i) => entity(i));
   return {
-    release: { appId: "rikkyo-uk-vocab", productVersion: "3.6.4", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
+    release: { appId: "rikkyo-uk-vocab", productVersion: "3.7.0", engineVersion: "common-vocab-engine/1.0.0", datasetVersion: "test", persistenceSchemaVersion: 3, exportFormatVersion: 3, indexedDbVersion: 3, commonEngineCommit: "test", enrichmentVersion: "test" },
     manifest: { appId: "rikkyo-uk-vocab", dataVersion: "test", registryEntityCount: 912, coreEntityCount: 241, generatedFromPhase: 24, enrichmentVersion: "test", sourcePapers: ["1","2","3","4","5","6"] },
     registry: Array.from({ length: 912 }, (_, i) => ({ stableId: i < core.length ? core[i]!.stableId : `registry-${i}` })),
     core,
@@ -198,11 +198,69 @@ describe("adaptive Phase 22 planner", () => {
   });
 
   it("keeps A/B provenance but does not split the learning queue by schedule", () => {
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
     const b = bundle();
     const plan = ensurePlan("g1", 1200, undefined, "Europe/London", new Date("2026-09-17T12:00:00Z"));
     const a = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 20, { mode: "recommended", schedule: "A" });
     const scheduleB = buildQueue(b, [], plan, new Date("2026-09-17T12:00:00Z"), 20, { mode: "recommended", schedule: "B" });
     expect(a.map((x) => x.entity.stableId)).toEqual(scheduleB.map((x) => x.entity.stableId));
+    random.mockRestore();
+  });
+
+  it("blocks an overdue opposite direction after a correct answer, including legacy short intervals", () => {
+    const b = bundle(), now = new Date("2026-09-22T12:00:00Z"), e = b.core[0]!;
+    const correct = applyStudyAnswer(createInitialState("g", e.stableId, "meaningRecognition", now), "Good", now);
+    correct.dueAt = new Date(now.getTime() + 60_000).toISOString();
+    const overdue = createInitialState("g", e.stableId, "formProduction", new Date(now.getTime() - 86400000));
+    const plan = ensurePlan("g", 1200, undefined, "Europe/London", now);
+    for (const mode of ["recommended", "challenge", "review", "random"] as const) {
+      expect(buildQueue(b, [correct, overdue], plan, new Date(now.getTime() + 600_000), 50, { mode }).some(x => x.entity.stableId === e.stableId)).toBe(false);
+    }
+    expect(buildQueue(b, [correct, overdue], plan, new Date(now.getTime() + 86400000), 50).filter(x => x.entity.stableId === e.stableId)).toHaveLength(1);
+  });
+
+  it("schedules relearning graduation in the future instead of restoring the old due date", () => {
+    const now = new Date("2026-09-22T12:00:00Z");
+    const initial = { ...createInitialState("g", "word", "meaningRecognition", now), stage: "review" as const };
+    const missed = applyStudyAnswer(initial, "Again", now);
+    const retry = applyStudyAnswer(missed, "Good", new Date(now.getTime() + 600_000));
+    const tomorrow = new Date(now.getTime() + 2 * 86400000);
+    const graduated = applyStudyAnswer(retry, "Good", tomorrow);
+    expect(graduated.stage).toBe("review");
+    expect(Date.parse(graduated.dueAt)).toBeGreaterThanOrEqual(tomorrow.getTime() + 86400000);
+    expect(graduated.card?.due.toISOString()).toBe(graduated.dueAt);
+  });
+
+  it("does not squeeze a late mistake into an immediate retry", () => {
+    const b = bundle(), plan = ensurePlan("g", 1200);
+    const queue = buildQueue(b, [], plan, new Date(), 10).map(x => makeQuestion(b, x));
+    const last = queue[9]!, retry = makeRetryQuestion(b, last, b.core.find(e => e.stableId === last.stableId)!);
+    expect(insertDueRetry(queue, 9, retry, 6)).toBe(false);
+    expect(queue).toHaveLength(10);
+    expect(insertDueRetry(queue, 0, retry, 6)).toBe(true);
+    expect(queue[7]).toBe(retry);
+  });
+
+  it("repairs legacy adjacent retries without modifying answered positions", () => {
+    const b = bundle(), e = b.core[0]!;
+    const original = makeQuestion(b, { entity: e, skillKey: "meaningRecognition", lane: "acquisition" });
+    const retry = makeRetryQuestion(b, original, e);
+    const rest = b.core.slice(1, 10).map(entity => makeQuestion(b, { entity, skillKey: "meaningRecognition", lane: "acquisition" }));
+    const spaced = spaceStoredRetries(b, [original, retry, ...rest], 1);
+    expect(spaced[0]).toBe(original);
+    expect(spaced[7]).toBe(retry);
+    expect(spaceStoredRetries(b, [original, retry], 1)).toEqual([original]);
+  });
+
+  it("varies the opening selection while keeping each session free of duplicate words", () => {
+    const b = bundle(), plan = ensurePlan("g", 1200), random = vi.spyOn(Math, "random");
+    random.mockReturnValue(0.1);
+    const a = buildQueue(b, [], plan, new Date(), 10);
+    random.mockReturnValue(0.9);
+    const other = buildQueue(b, [], plan, new Date(), 10);
+    random.mockRestore();
+    expect(a.map(x => x.entity.stableId)).not.toEqual(other.map(x => x.entity.stableId));
+    expect(new Set(other.map(x => x.entity.stableId)).size).toBe(10);
   });
 
   it("creates source-aware question variants", () => {

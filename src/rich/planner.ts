@@ -2,7 +2,8 @@ import { hydrateCard, Rating, newCard, schedule } from "../fsrsAdapter";
 import { SCHEDULER_CONFIG } from "../config";
 import type { RuntimeBundle, RuntimeEntity } from "../runtime";
 import type { DailyPlanRecord, Lane, QuestionKind, QuestionRun, ScheduleFilter, SkillKey, SkillState, StudyMode } from "./types";
-import { VOCABULARY_SESSION_ENGINE } from "../common-engine/session-orchestration";
+import { VOCABULARY_SESSION_ENGINE } from "../common-engine/waseda-session";
+import { v75WeightedWithoutReplacement } from "../common-engine/waseda-selection";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -91,11 +92,25 @@ function matchesEntity(entity: RuntimeEntity, mode: StudyMode): boolean {
 }
 export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: DailyPlanRecord, now = new Date(), limit = 60, options: StudyOptions = {}): PlannedItem[] {
   const mode = options.mode ?? "recommended";
-  const explicitBandFocus = options.additionalNew === true || mode === "recommended" || mode === "foundation" || mode === "core" || mode === "challenge";
   const byKey = new Map(memory.map((x) => [x.key, x]));
   const nowMs = now.getTime();
+  // The two stored skills belong to one word. A newer answer in either direction
+  // must also protect against an overdue state in the other direction.
+  const latestById = new Map<string, SkillState>();
+  for (const state of memory) {
+    if (!state.lastSeenAt) continue;
+    const latest = latestById.get(state.stableId);
+    if (!latest || Date.parse(state.lastSeenAt) > Date.parse(latest.lastSeenAt!)) latestById.set(state.stableId, state);
+  }
+  const coolingDown = (id: string) => {
+    const latest = latestById.get(id);
+    if (!latest) return false;
+    const answeredCorrectly = latest.stage === "review" || latest.stepIndex > 0;
+    return nowMs - Date.parse(latest.lastSeenAt!) < (answeredCorrectly ? DAY : 10 * MINUTE);
+  };
   const items: PlannedItem[] = [];
   for (const entity of bundle.core.filter((x) => matchesEntity(x, mode))) for (const skillKey of skillsFor(entity)) {
+    if (coolingDown(entity.stableId)) continue;
     if (options.additionalNew) continue;
     const state = byKey.get(stateKey(entity.stableId, skillKey));
     if (mode === "unlearned") continue;
@@ -113,14 +128,9 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
 
   // Recommended and focused study remain available beyond the daily target.
   // Due work stays first; per-word introduction/cooldown guards still apply.
-  if ((!plan.acquisitionClosed || explicitBandFocus) && items.length < limit && mode !== "weak" && mode !== "review") {
+  if (items.length < limit && mode !== "weak" && mode !== "review") {
     const introduced = new Set(plan.introducedStableIds);
     const introducedSkills = new Set(plan.introducedSkillKeys ?? []);
-    const activeEntities = new Set(memory.filter((x) => x.stage !== "provisional" && x.stage !== "acquisitionCandidate").map((x) => x.stableId));
-    const newEntityCap = plan.newEntityCap ?? 12;
-    const storedBudget = plan.acquisitionBudget ?? plan.acquisitionCap;
-    const budgetLimit = Math.min(storedBudget, plan.acquisitionCap);
-    let remainingBudget = explicitBandFocus ? limit - items.length : Math.max(0, budgetLimit - (plan.acquisitionUsed ?? 0));
     const queuedIds = new Set(items.map((item) => item.entity.stableId));
     const candidates = bundle.core
       .filter((e) => !memory.some((s) => s.stableId === e.stableId && s.lastSeenAt && nowMs - Date.parse(s.lastSeenAt) < DAY))
@@ -129,12 +139,26 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
         const existing = byKey.get(stateKey(e.stableId, s));
         return !existing || existing.stage === "acquisitionCandidate";
       }))
-      .sort((a, b) => mode === "random"
-        ? stableNumber(`${plan.learningDayId}:random:${a.stableId}`) - stableNumber(`${plan.learningDayId}:random:${b.stableId}`)
-        : priority(a) - priority(b) || b.observedFrequency - a.observedFrequency || stableNumber(`${plan.learningDayId}:${a.stableId}`) - stableNumber(`${plan.learningDayId}:${b.stableId}`));
+      ;
+    // Execute Waseda's actual without-replacement planner. A fixed daily sort
+    // used to reproduce the same opening questions whenever a session stopped.
+    const pool = candidates.map((entity) => ({ id: entity.stableId, entity }));
+    const selected = VOCABULARY_SESSION_ENGINE.buildPlan({
+      pool, mode, year: "all", size: pool.length, unlimitedSize: -1,
+      getId: (item) => item.id,
+      isSpecialMode: () => false,
+      buildSpecialPlan: () => ({ baseQueueIds: [], actualSessionSize: 0 }),
+      isRandomMode: () => false,
+      shuffle: (items) => items,
+      weightedWithoutReplacement: v75WeightedWithoutReplacement,
+      score: (item) => mode === "random" ? 1 : [180, 140, 95, 60][priority(item.entity)]! + Math.sqrt(item.entity.observedFrequency) * 4,
+      isSpecialEntity: (item) => item.entity.targetBand === "Challenge",
+    });
+    const candidatesById = new Map(candidates.map((item) => [item.stableId, item]));
 
-    for (const entity of candidates) {
-      if (items.length >= limit || remainingBudget <= 0) break;
+    for (const id of selected.baseQueueIds) {
+      const entity = candidatesById.get(id)!;
+      if (items.length >= limit) break;
       // Waseda-parity progression: every unseen entity starts with objective
       // English -> Japanese recognition before production is introduced.
       const orderedSkills = skillsFor(entity);
@@ -145,17 +169,14 @@ export function buildQueue(bundle: RuntimeBundle, memory: SkillState[], plan: Da
       if (!skillKey) continue;
       const skillToken = stateKey(entity.stableId, skillKey);
       if (introducedSkills.has(skillToken)) continue;
-      const isNewEntity = !activeEntities.has(entity.stableId);
-      if (!explicitBandFocus && isNewEntity && !introduced.has(entity.stableId) && introduced.size >= newEntityCap) continue;
       const state = byKey.get(skillToken);
       items.push({ entity, skillKey, lane: "acquisition", ...(state ? { state } : {}) });
       queuedIds.add(entity.stableId);
-      remainingBudget -= 1;
       introducedSkills.add(skillToken);
-      if (isNewEntity) introduced.add(entity.stableId);
+      introduced.add(entity.stableId);
     }
   }
-  return VOCABULARY_SESSION_ENGINE.take(items, limit);
+  return items.slice(0, Math.max(0, limit));
 }
 
 export function createInitialState(generationId: string, stableId: string, skillKey: SkillKey, now = new Date()): SkillState {
@@ -186,7 +207,8 @@ export function applyStudyAnswer(previous: SkillState, rating: "Again" | "Hard" 
   const stepIndex = previous.stepIndex + 1;
   if (stepIndex < steps.length) return { ...next, stepIndex, dueAt: new Date(now.getTime() + steps[stepIndex]!).toISOString() };
   if (previous.stage === "relearning") {
-    const card = previous.card ?? schedule(newCard(now), Rating.Again, now);
+    const card = schedule(previous.card ?? newCard(now), rating === "Hard" ? Rating.Hard : Rating.Good, now);
+    card.due = new Date(Math.max(card.due.getTime(), now.getTime() + DAY));
     return { ...next, stage: "review", card, stepIndex: 0, dueAt: card.due.toISOString(), episodeId: null };
   }
   const card = schedule(newCard(now), Rating.Good, now);
@@ -312,6 +334,30 @@ export function dedupeStoredQuestionQueue(queue: QuestionRun[], resumeIndex: num
 }
 
 export function retryGap(entity: RuntimeEntity): 6 | 8 { return entity.priority === "S" || entity.targetBand === "Foundation" ? 6 : 8; }
+/** Repair only unanswered legacy retries; answered positions and IDs stay intact. */
+export function spaceStoredRetries(bundle: RuntimeBundle, queue: QuestionRun[], resumeIndex: number): QuestionRun[] {
+  const repaired = [...queue];
+  for (let index = resumeIndex; index < repaired.length; index++) {
+    const question = repaired[index]!;
+    if (!question.isRetry || !question.retryOf) continue;
+    const original = repaired.findIndex(q => q.questionInstanceId === question.retryOf);
+    const entity = bundle.core.find(e => e.stableId === question.stableId);
+    if (original < 0 || original >= index || !entity) continue;
+    const earliest = original + retryGap(entity) + 1;
+    if (index >= earliest) continue;
+    repaired.splice(index, 1);
+    if (earliest <= repaired.length) repaired.splice(earliest, 0, question);
+    index--;
+  }
+  return repaired;
+}
+/** Like Waseda, do not force a not-yet-due retry at the end of a session. */
+export function insertDueRetry(queue: QuestionRun[], index: number, retry: QuestionRun, gap: number): boolean {
+  const insertion = index + gap + 1;
+  if (insertion > queue.length) return false;
+  queue.splice(insertion, 0, retry);
+  return true;
+}
 export function makeRetryQuestion(bundle: RuntimeBundle, original: QuestionRun, entity: RuntimeEntity): QuestionRun {
   const questionInstanceId = crypto.randomUUID();
   const { context: _context, ...base } = original;

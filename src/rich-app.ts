@@ -1,9 +1,9 @@
-import "./styles.css";
+import "./common-engine/waseda-shell.css";
 import "./rich/styles.css";
 import { loadRuntimeBundle, type RuntimeBundle, type RuntimeEntity } from "./runtime";
 import { openStudyDb, SingleWriter } from "./storage";
 import { buildDiagnostic, provisionalFromDiagnostic } from "./rich/diagnostic";
-import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, gradeInput, learningDayId, makeQuestion, makeRetryQuestion, recordAcquisition, refreshStoredQuestion, retryGap, stateKey } from "./rich/planner";
+import { applyStudyAnswer, buildQueue, createInitialState, dedupeStoredQuestionQueue, ensurePlan, gradeInput, insertDueRetry, learningDayId, makeQuestion, makeRetryQuestion, recordAcquisition, refreshStoredQuestion, retryGap, spaceStoredRetries, stateKey } from "./rich/planner";
 import { clearActiveSession, commitEventOnly, createBackup, discardInvalidActiveSession, ensureGeneration, exportEnvelope, listBackups, loadActiveSession, loadBackup, loadRichState, repairStartupTransientState, replaceGeneration, saveActiveSession, savePlan, savePreferences, saveSkillAndEvent, verifyEnvelope } from "./rich/store";
 import type { DailyPlanRecord, DomainEvent, Preferences, QuestionRun, SkillState, StoredSessionRecord, StudyMode } from "./rich/types";
 import { analysisView, homeView, questionView, sessionResultView, settingsView, statsView, wordsView, type Route } from "./rich/views";
@@ -33,6 +33,13 @@ let session: Session | null = null;
 let wordQuery = "";
 let wordFilter = "all";
 let activePreferences: Preferences | null = null;
+let resumePending = false;
+root.addEventListener("click", (event) => {
+  if ((event.target as Element).closest("#quick-speak")) {
+    const q = session?.queue[session.index];
+    speak(q && !resumePending ? entity(q.stableId).lemma : "vocabulary");
+  }
+});
 const graded = new Set<string>();
 const WRITER_OWNER_KEY = "rikkyo-uk-vocab:writer-owner:v3";
 
@@ -105,20 +112,6 @@ function todayAnswered(events: DomainEvent[], timeZone: string): number {
   const day = learningDayId(new Date(), timeZone);
   return events.filter((e) => ["AnswerCommitted", "DiagnosticAnswer"].includes(e.type) && learningDayId(new Date(e.at), timeZone) === day).length;
 }
-function effectivePlan(plan: DailyPlanRecord, prefs: Preferences, memory: SkillState[]): DailyPlanRecord {
-  const due = memory.filter((x) => Date.parse(x.dueAt) <= Date.now()).length;
-  let cap = 12;
-  let closed = plan.acquisitionClosed;
-  if (due > 100) closed = true;
-  else if (due > 40) cap = 4;
-  if (prefs.examDate) {
-    const days = Math.ceil((Date.parse(`${prefs.examDate}T12:00:00Z`) - Date.now()) / 86400000);
-    if (days <= 3) closed = true;
-    else if (days <= 7) cap = Math.min(cap, 3);
-    else if (days <= 14) cap = Math.min(cap, 6);
-  }
-  return { ...plan, acquisitionCap: cap, acquisitionClosed: closed || ((plan.activeStudySeconds ?? 0) >= plan.targetSeconds) };
-}
 async function state() {
   if (!ctx) throw new Error("NO_CONTEXT");
   const s = await loadRichState(ctx.db);
@@ -134,7 +127,6 @@ async function state() {
     s.plans.find((x) => x.learningDayId === day),
     preferences.learningTimeZone,
   );
-  plan = effectivePlan(plan, preferences, s.memory);
   if (!s.plans.some((x) => x.key === plan.key) && ctx.writable) await savePlan(ctx.db, ctx.writer, plan, "DailyPlanCreated");
   return { generation, preferences, memory: s.memory, plans: s.plans, events: s.events, plan };
 }
@@ -165,6 +157,26 @@ async function renderHome() {
   if (!ctx) return;
   const s = await state();
   root.innerHTML = homeView({ bundle: ctx.bundle, plan: s.plan, memory: s.memory, answeredToday: todayAnswered(s.events, s.preferences.learningTimeZone), activeSeconds: s.plan.activeStudySeconds ?? 0, diagnosticCompleted: s.preferences.diagnosticCompleted, preferences: s.preferences });
+  window.scrollTo(0, 0);
+  if (session) {
+    const overlay = document.createElement("div");
+    overlay.className = "overlay show";
+    overlay.innerHTML = `<section class="sheet" role="dialog" aria-modal="true" aria-labelledby="resume-title"><div class="sheet-handle"></div><h2 id="resume-title">前回の学習が途中です</h2><p class="small">${session.queue.slice(0, session.index).filter(q => !q.isRetry).length} / ${session.baseTotal}問まで進んでいます。</p><div class="row"><button class="primary full" id="resume-session">続きから再開</button><button class="danger-lite full" id="finish-session">このセッションを終了</button></div></section>`;
+    root.append(overlay);
+    document.querySelector("#resume-session")?.addEventListener("click", () => {
+      resumePending = false;
+      location.hash = session!.mode;
+      void renderQuestion();
+    });
+    document.querySelector("#finish-session")?.addEventListener("click", () => void (async () => {
+      if (!ctx || !await ensureWritable()) return;
+      await clearActiveSession(ctx.db, ctx.writer, "user-stop");
+      session = null;
+      resumePending = false;
+      await renderHome();
+    })());
+    document.querySelector<HTMLButtonElement>("#resume-session")?.focus();
+  }
   document.querySelector("#start-study")?.addEventListener("click", () => void startStudy());
   document.querySelector("#start-diagnostic")?.addEventListener("click", () => void startDiagnostic());
   const mode = document.querySelector<HTMLSelectElement>("#study-mode"), size = document.querySelector<HTMLSelectElement>("#session-size");
@@ -202,20 +214,20 @@ async function renderSettings() {
   populateVoices(s.preferences);
 }
 async function renderRoute() {
-  if (session && route() !== "study" && route() !== "diagnostic") session = null;
   const r = route();
   if (r === "words") return renderWords();
   if (r === "stats") return renderStats();
   if (r === "analysis") return renderAnalysis();
   if (r === "settings") return renderSettings();
-  if ((r === "study" || r === "diagnostic") && session) return renderQuestion();
+  if ((r === "study" || r === "diagnostic") && session && !resumePending) return renderQuestion();
   return renderHome();
 }
 
 async function startStudy(additionalNew = false) {
   if (!await ensureWritable() || !ctx) return;
+  if (session) return renderHome();
   const s = await state();
-  const plan = effectivePlan(s.plan, s.preferences, s.memory);
+  const plan = s.plan;
   const requested = s.preferences.sessionSize ?? 20;
   const studyMode = s.preferences.studyMode ?? "recommended";
   const limit = requested === 0 ? 60 : requested;
@@ -232,7 +244,7 @@ async function startStudy(additionalNew = false) {
     const heading = document.createElement("h2");
     heading.textContent = studyMode === "recommended" ? "今のおすすめ学習は完了です" : "このモードで今出題できる問題はありません";
     const message = document.createElement("p");
-    message.textContent = (studyMode === "recommended" ? "今出題できる語はありません。同じ語の短時間反復を避け、復習の待機時間を守っています。" : "このモードの対象語・日次の導入条件・復習の待機時間を考慮しています。") + (nextDue ? " 次の復習予定：" + new Date(nextDue).toLocaleString("ja-JP", { timeZone: s.preferences.learningTimeZone }) : " 現在、次の復習予定はありません。");
+    message.textContent = (studyMode === "recommended" ? "今出題できる語はありません。同じ語の短時間反復を避け、復習の待機時間を守っています。" : "このモードの対象語・復習の待機時間を考慮しています。") + (nextDue ? " 次の復習予定：" + new Date(nextDue).toLocaleString("ja-JP", { timeZone: s.preferences.learningTimeZone }) : " 現在、次の復習予定はありません。");
     notice.append(heading, message);
     if (extra.length) {
       const button = document.createElement("button");
@@ -259,6 +271,7 @@ async function startStudy(additionalNew = false) {
 }
 async function startDiagnostic() {
   if (!await ensureWritable() || !ctx) return;
+  if (session) return renderHome();
   const s = await state();
   const questions = buildDiagnostic(ctx.bundle);
   const now = new Date().toISOString();
@@ -274,7 +287,8 @@ async function renderQuestion() {
     const completed = session;
     await clearActiveSession(ctx.db, ctx.writer, "completed");
     session = null;
-    root.innerHTML = sessionResultView({ mode: completed.mode, baseTotal: completed.baseTotal, correct: completed.correct, wrong: completed.wrong, retryAnswered: completed.retryAnswered, missed: [...completed.missedStableIds].map((id) => entity(id)) });
+    await renderHome();
+    root.insertAdjacentHTML("beforeend", sessionResultView({ mode: completed.mode, baseTotal: completed.baseTotal, correct: completed.correct, wrong: completed.wrong, retryAnswered: completed.retryAnswered, missed: [...completed.missedStableIds].map((id) => entity(id)) }));
     document.querySelector("#result-home")?.addEventListener("click", () => { location.hash = "home"; });
     document.querySelector("#result-retry")?.addEventListener("click", () => void startStudy());
     return;
@@ -285,7 +299,8 @@ async function renderQuestion() {
   const baseBefore = answeredPrefix.filter((question) => !question.isRetry).length;
   const baseAnswered = baseBefore + (session.feedback && !q.isRetry ? 1 : 0);
   const basePosition = Math.min(session.baseTotal, baseBefore + (q.isRetry ? 0 : 1));
-  root.innerHTML = questionView(q, e, session.mode, { correct: session.correct, wrong: session.wrong, basePosition, baseAnswered, baseTotal: session.baseTotal, retryAnswered: session.retryAnswered }, session.feedback);
+  root.innerHTML = questionView(q, e, session.mode, { correct: session.correct, wrong: session.wrong, basePosition, baseAnswered, baseTotal: session.baseTotal, retryAnswered: session.retryAnswered, isLast: session.index === session.queue.length - 1 }, session.feedback);
+  if (!session.feedback) window.scrollTo(0, 0);
   document.querySelector("#speak-word")?.addEventListener("click", () => speak(e.lemma));
   document.querySelector("#audio-fallback")?.addEventListener("click", () => void (async () => {
     if (!session || !await ensureWritable()) return;
@@ -372,7 +387,7 @@ async function answer(given: string) {
     session.missedStableIds.add(q.stableId);
     if (session.mode === "study" && !q.isRetry && !session.queue.slice(session.index + 1).some((question) => question.isRetry && question.stableId === q.stableId)) {
       const retry = makeRetryQuestion(ctx.bundle, q, entity(q.stableId));
-      session.queue.splice(Math.min(session.index + retryGap(entity(q.stableId)) + 1, session.queue.length), 0, retry);
+      insertDueRetry(session.queue, session.index, retry, retryGap(entity(q.stableId)));
     }
   }
   if (q.isRetry) session.retryAnswered += 1;
@@ -503,7 +518,7 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     return;
   }
   const refreshedQueue = stored.queue.map((question, index) => index < resumeIndex ? question : refreshStoredQuestion(ctx!.bundle, question, stored.mode));
-  const dedupedQueue = dedupeStoredQuestionQueue(refreshedQueue, resumeIndex);
+  const dedupedQueue = spaceStoredRetries(ctx.bundle, dedupeStoredQuestionQueue(refreshedQueue, resumeIndex), resumeIndex);
   const diagnosticEvents = initialEvents.filter((e) => e.type === "DiagnosticAnswer" && e.payload.sessionId === stored.sessionId);
   session = {
     generationId: stored.generationId,
@@ -520,7 +535,7 @@ async function recoverSession(initialEvents: DomainEvent[], generationId: string
     retryAnswered: stored.retryAnswered ?? 0,
     missedStableIds: new Set(stored.missedStableIds ?? []),
   };
-  location.hash = stored.mode;
+  resumePending = true;
   await checkpointSession(resumeIndex, "SessionResumed");
 }
 

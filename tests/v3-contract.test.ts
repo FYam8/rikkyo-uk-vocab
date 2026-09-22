@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { COMMON_ENGINE_PIN, ENGINE_VERSION, EXPORT_FORMAT, EXPORT_FORMAT_VERSION, INDEXED_DB_VERSION, PERSISTENCE_SCHEMA_VERSION, PRODUCT_VERSION, RELEASE_TUPLE, SCHEDULER_CONFIG } from "../src/config";
 import { hydrateCard } from "../src/fsrsAdapter";
 import { stableJson, verifyEnvelope } from "../src/rich/store";
-import { VOCABULARY_SESSION_ENGINE } from "../src/common-engine/session-orchestration";
+import { VOCABULARY_SESSION_ENGINE } from "../src/common-engine/waseda-session";
 
 describe("v3 frozen compatibility contract", () => {
   it("keeps product, persistence, export and IndexedDB versions independent", () => {
-    expect(PRODUCT_VERSION).toBe("3.6.4");
+    expect(PRODUCT_VERSION).toBe("3.7.0");
     expect(ENGINE_VERSION).toBe("common-vocab-engine/1.0.0");
     expect(PERSISTENCE_SCHEMA_VERSION).toBe(3);
     expect(EXPORT_FORMAT_VERSION).toBe(3);
@@ -21,7 +21,7 @@ describe("v3 frozen compatibility contract", () => {
     expect(COMMON_ENGINE_PIN.repository).toBe("FYam8/english-vocab");
     expect(COMMON_ENGINE_PIN.vendoredModule).toContain("common-engine");
     expect(COMMON_ENGINE_PIN.uiContractSha256).toHaveLength(64);
-    expect(VOCABULARY_SESSION_ENGINE.take([1, 2, 3], 2)).toEqual([1, 2]);
+    expect(VOCABULARY_SESSION_ENGINE.dueRetry([{ wordId: "a", dueAfterTotal: 6 }], 5, () => false)).toBeNull();
   });
 
   it("hydrates JSON FSRS dates before scheduling", () => {
