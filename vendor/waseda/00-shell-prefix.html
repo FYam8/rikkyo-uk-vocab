@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f2f2f7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>立教英国学院 Vocabulary Coach</title>
+<title>早稲渋 Vocabulary Coach</title>
 <style>
 :root{
   color-scheme:light dark;
@@ -118,13 +118,12 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 
 @media(min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}.answer-grid{grid-template-columns:1fr 1fr}}
 </style>
-<link rel="manifest" href="/rikkyo-uk-vocab/manifest.webmanifest">
 </head>
 <body>
 <div class="app">
 <header class="topbar">
   <div class="topbar-row">
-    <div><div class="title" id="headerTitle">おすすめ学習</div><div class="subtitle">立教英国学院 2024–2026 過去問・適応学習</div></div>
+    <div><div class="title" id="headerTitle">おすすめ学習</div><div class="subtitle">早稲渋 2019–2026 過去問・4層適応学習</div></div>
     <button class="icon-btn" id="quickSpeak" aria-label="音声テスト">🔊</button>
   </div>
 </header>
@@ -160,7 +159,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
     </div>
     <div class="card">
       <h3>この単語帳の設計</h3>
-      <p class="small muted" style="margin:0">自己申告は使いません。実際の正誤だけで「未学習 → 学習中 → 安定 → 覚えた → 定着」を判定します。立教のFoundation・Core・Challengeを対象に、初回の4択から習熟度に応じて問題形式と復習間隔が変わります。</p>
+      <p class="small muted" style="margin:0">自己申告は使いません。実際の正誤だけで「未学習 → 学習中 → 安定 → 覚えた → 定着」を判定します。語彙は①通常学習、②基礎診断、③75点挑戦、④参照のみの4層。基礎診断語は初回客観テストに正解すれば反復を大幅に減らし、参照語（日本語注釈付き・年度固有テーマ語など）は検索できますが通常クイズには出しません。</p>
     </div>
   </div>
 
@@ -217,7 +216,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
     <div class="grid" id="analysisGrid"></div>
   </div>
   <div class="card">
-    <h3>教材区分・重要度</h3>
+    <h3>学習4層・重要度</h3>
     <div id="analysisCounts"></div>
   </div>
   <div class="card">
@@ -280,5 +279,5 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 </div>
 <div class="toast" id="toast"></div>
 
-<script type="module" src="/src/coach/bootstrap.js"></script>
-</body></html>
+<script>
+"use strict";

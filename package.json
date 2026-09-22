@@ -1,14 +1,14 @@
 {
   "name": "rikkyo-uk-vocab",
   "private": true,
-  "version": "3.7.0",
+  "version": "4.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node tools/prepare-coach.mjs && vite",
+    "build": "node tools/prepare-coach.mjs && tsc -b && vite build",
     "test": "vitest run",
     "check": "pnpm run build && pnpm run test",
-    "qa:browser": "node qa/browser-qa.mjs"
+    "qa:browser": "node qa/coach-browser-qa.mjs"
   },
   "dependencies": {
     "ts-fsrs": "5.4.2"

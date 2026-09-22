@@ -1,0 +1,37 @@
+{
+  "sourceRepository": "FYam8/english-vocab",
+  "sourceCommit": "6f4788386a1935d6e2703c694257c1f327b0f831",
+  "runtimeOrder": [
+    "15-waseda-persistence.js",
+    "20-engine-candidate.js",
+    "common-engine/session-orchestration.js",
+    "common-engine/learning-ui-runtime.js",
+    "30-compat-runtime.js",
+    "31-waseda-session-runtime.js",
+    "31a-waseda-planning-policy.js",
+    "32-session-planning-runtime.js",
+    "33-v75-ui-runtime.js",
+    "34-waseda-memory-policy.js",
+    "35-v76-memory-runtime.js",
+    "36-v76-engine-integration.js",
+    "37-v76-waseda-ui-runtime.js"
+  ],
+  "files": {
+    "90-shell-suffix.html": "89bfca9e9c40aa28dcbe0554737c4db5a03ecb14b9a1f23beca2ddd50fafb75c",
+    "30-compat-runtime.js": "7ae89188f178b358eb78a65f7159395d8027aa08fb6e918a1d7d5c7c7e5fea84",
+    "32-session-planning-runtime.js": "643bd528980b0a00103ff9dde07327809b1353b1c8159642bc42103a3359bc0c",
+    "36-v76-engine-integration.js": "81a84fa3c487cbc11eedff6d11a71f11761ac21967bc561c89c031885dc3adf9",
+    "00-shell-prefix.html": "124bb350175c2863dc661365a875648c60590a2b09d28c9b75ff19a4a61615e1",
+    "37-v76-waseda-ui-runtime.js": "8f79826041b60445c99be3555b5dc1d13f439581866ed3b184bb9b82f33b004e",
+    "31a-waseda-planning-policy.js": "d6639c2e16bab8eacbd7ede27a87fc9e7aed8f7ff2140f92341979deb1df3624",
+    "35-v76-memory-runtime.js": "384e3bcc818219c932ed51dd971e3e9886eaec6454f621a2d899a380ed9bf4c9",
+    "31-waseda-session-runtime.js": "c574193cfae6b542f2d89f9282c106457093e84b44ac048d5da98fe0c6b38467",
+    "34-waseda-memory-policy.js": "b6260fc954acb3b495a172c6709c5bb14ad4f3652802e11cf7ace95851543f62",
+    "20-engine-candidate.js": "a1298c0ceacd4e908d9b04790c2d6a6789fbfde2e6eab58786d632adc40a19ec",
+    "40-runtime-bootstrap-tail.js": "c75daac3527b417e35721f974b3407f8fd99521c11943ec089868d2ac3cb99f0",
+    "33-v75-ui-runtime.js": "4a4e631201016d80076f9b0b0273bfe48926c49fa080551a6881a4fd4250acf3",
+    "15-waseda-persistence.js": "73f3dcf5cf3974394038c902e56943f10ecc320fcdeb53052317dcbf75335211",
+    "common-engine/learning-ui-runtime.js": "3ecd8f6f4ccd4ad5bdc5508301ce4e0d155ef5655cde7e464ac3fb3c5c985ef4",
+    "common-engine/session-orchestration.js": "e0510dcae081e852f9002bc5d7f8f1af3aa1af2c57e0254030eacb61d62974b6"
+  }
+}
