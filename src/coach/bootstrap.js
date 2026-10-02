@@ -98,6 +98,8 @@ async function boot(){
   window.addEventListener('storage',event=>{if(event.key===KEY)location.reload()});
   const script=document.createElement('script');script.src=import.meta.env.BASE_URL+'assets/coach-runtime.js';
   await new Promise((resolve,reject)=>{script.onload=resolve;script.onerror=()=>reject(new Error('アプリを読み込めませんでした'));document.body.append(script)});
+  // Optional summary sync starts after the unchanged learning engine is ready.
+  void import('../progress/progressSync.js').then(module=>module.init()).catch(()=>{});
   if('serviceWorker' in navigator && import.meta.env.PROD)navigator.serviceWorker.register(import.meta.env.BASE_URL+'sw.js').catch(console.error);
 }
 boot().catch(error=>{

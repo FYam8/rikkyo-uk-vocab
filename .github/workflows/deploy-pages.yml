@@ -103,6 +103,8 @@ jobs:
           curl -fsSL "https://raw.githubusercontent.com/FYam8/english-vocab/6f4788386a1935d6e2703c694257c1f327b0f831/src/common-engine/learning-ui-runtime.js" | sha256sum -c <(echo "3ecd8f6f4ccd4ad5bdc5508301ce4e0d155ef5655cde7e464ac3fb3c5c985ef4  -")
 
       - run: pnpm run check
+      - run: node tools/verify-shared-progress.mjs --upstream
+      - run: node tools/test-progress-projection.mjs
 
       - name: Verify actual Waseda source parity
         run: node qa/verify-coach-source.mjs
@@ -112,13 +114,15 @@ jobs:
 
       - name: Browser QA twice
         run: |
-          pnpm exec vite preview --host 127.0.0.1 --port 4173 &
+          node qa/serve-built-site.mjs &
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:4173/rikkyo-uk-vocab/ >/dev/null; then break; fi
             sleep 1
           done
-          QA_PASS=CI-CLEAN-1 pnpm run qa:browser
-          QA_PASS=CI-CLEAN-2 pnpm run qa:browser
+          QA_PASS=CI-CLEAN-1 QA_WIDTH=390 pnpm run qa:browser
+          QA_PASS=CI-CLEAN-1 QA_WIDTH=1280 pnpm run qa:browser
+          QA_PASS=CI-CLEAN-2 QA_WIDTH=390 pnpm run qa:browser
+          QA_PASS=CI-CLEAN-2 QA_WIDTH=1280 pnpm run qa:browser
 
       - uses: actions/upload-artifact@v4
         with:
@@ -187,5 +191,7 @@ jobs:
         env:
           QA_BASE_URL: https://fyam8.github.io/rikkyo-uk-vocab/?release=${{ github.sha }}
         run: |
-          QA_PASS=PRODUCTION-CLEAN-1 pnpm run qa:browser
-          QA_PASS=PRODUCTION-CLEAN-2 pnpm run qa:browser
+          QA_PASS=PRODUCTION-CLEAN-1 QA_WIDTH=390 pnpm run qa:browser
+          QA_PASS=PRODUCTION-CLEAN-1 QA_WIDTH=1280 pnpm run qa:browser
+          QA_PASS=PRODUCTION-CLEAN-2 QA_WIDTH=390 pnpm run qa:browser
+          QA_PASS=PRODUCTION-CLEAN-2 QA_WIDTH=1280 pnpm run qa:browser

@@ -3,9 +3,16 @@ import assert from 'node:assert/strict';
 import {readFile,mkdir} from 'node:fs/promises';
 const url=process.env.QA_BASE_URL||'http://127.0.0.1:4173/rikkyo-uk-vocab/';
 const browser=await chromium.launch({headless:true});
+const width=Number(process.env.QA_WIDTH||390);
+async function isolatedContext(options={}){
+ const context=await browser.newContext({viewport:{width,height:844},isMobile:width===390,hasTouch:width===390,...options});
+ // Browser QA uses synthetic learning records, including on the published site.
+ await context.route('https://*.workers.dev/**',route=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify({ok:false,code:'isolated_ui_test'})}));
+ return context;
+}
 const errors=[];
 async function fresh(){
- const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+ const context=await isolatedContext({serviceWorkers:'block'});
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url);await page.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  return page;
@@ -141,7 +148,7 @@ try{
  const unlimited=await fresh();await start(unlimited,'random','0');assert.equal(await unlimited.evaluate(()=>session.unlimited),true);
  const pool=new Set();for(let i=0;i<12;i++){const q=await answer(unlimited);assert.ok(!pool.has(q.id));pool.add(q.id);await unlimited.click('#nextBtn')}
  // Production service worker must cache the dynamically loaded full runtime.
- const offlineContext=await browser.newContext({viewport:{width:390,height:844}});const offline=await offlineContext.newPage();offline.on('pageerror',e=>errors.push(e.message));
+ const offlineContext=await isolatedContext();const offline=await offlineContext.newPage();offline.on('pageerror',e=>errors.push(e.message));
  await offline.goto(url);await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  await offline.evaluate(()=>navigator.serviceWorker.ready);await offline.reload();
  await offline.waitForFunction(()=>navigator.serviceWorker.controller&&window.RikkyoHost&&document.getElementById('audioQuestions'));

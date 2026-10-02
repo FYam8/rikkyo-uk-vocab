@@ -1,0 +1,50 @@
+{
+  "repository": "FYam8/waseshibu-progress-cloud",
+  "commit": "25c111ed4fc4dcd76b9af5053d6039698271e340",
+  "tag": "progress-prod-20261003-25c111e",
+  "productionVerified": true,
+  "workerVersion": "d4bfb631-d857-444f-9a20-72c49a73e2dc",
+  "workerDeployment": "dc34300d-31b8-44c3-930c-a06b9cd9f8e9",
+  "manifestSha256": "cfff01529f5f71871c5ba3c323b1c9240ca03a24bbd7aaaf30d59263cb52d082",
+  "files": {
+    "src/accessConfig.js": "86441e106ff858c462d00fedaa5d56f7622dc6d9d6735dcfda92282a15af407d",
+    "src/client/progress-transport.js": "9edfe701a45da206ad2b3da120329e5a0571828f89976bc7eb51f6bead87298d",
+    "src/dashboard.js": "5368e50439b6ca60bea1c8068aea747dde24dc8b8a0383c598a741c1aa0cddab",
+    "src/dashboardFormatting.js": "03c2c8b96f3a6868274876d74490d5f1996d0575e3d485701f02cfe1a59c87ed",
+    "src/indexV2.js": "00c72fc7c47bd8d1ba47161491fcf9207cfb2877412c773dd9e6ac1aa634d0c3",
+    "src/indexV3.js": "ec4541f06e4012b9ed0544b4959909e1f79ad7f44941fce68e41747331d7afdf",
+    "src/indexV4.js": "4e424a66658fe9d45fd202463479238923dfea54ad3dfadccc897bd61dbb8b31",
+    "src/indexV5.js": "49bad9819b557460c286b31ae6d350cc731fc08f5d4202bb596fbd1a39ecf5b8",
+    "src/indexV6.js": "aed38f4320b4e16392c1cb86404b4b8e56b8604ac4bf1befd5f29c35621a3e13",
+    "src/indexV7.js": "dfc0bdab4773d388accd904716280b1cc920142403551404bae143ae5352111b",
+    "src/indexV8.js": "f7caf6d2d5e46918d54bc6d031814ddbf9170f73937d4e73d47fe1d889b1fef3",
+    "src/indexV9.js": "c6e16503dd7318d1a39817967d07c53543803abeb1bfd6e4cd058ba1caeed0f9",
+    "src/platformConfig.js": "f9b9547df2d17924485e1cf619382dc26f571dad079649bd13086a72d13c5bdb",
+    "src/progressContract.js": "e90bb69bc75ef56fff363426bfc1a0b742ce6a08b7e91c651008019c35f01f88"
+  },
+  "waseClients": {
+    "waseshibu-english": "02b64840b3bdb5bf2e9a8fe079ec4ad2972627f3",
+    "waseshibu-math": "d8ef4b05d34fd70ef02d6ea6ccc9b9f5cea2878d",
+    "waseshibu-source": "614feda08d33ae4355750af6aca14151de4e4f74",
+    "english-vocab": "ead3af597ff0dfb1e9f39d496b8f5b82ae31dbc6"
+  },
+  "verification": {
+    "cleanRounds": [
+      1,
+      2
+    ],
+    "checksPerRound": 180,
+    "cloudMainCi": 37064995749,
+    "kokugoMainCi": 37061002501,
+    "kokugoPublish": 37061423225,
+    "kokugoLiveAudit": 37061496267,
+    "productionUi": "390px touch and 1280px; all four apps; cloud writes intercepted",
+    "liveWorkerModules": 15,
+    "liveWorkerModulesMatch": true,
+    "cleanCandidate": "4f2427458c084e14ed18843335ce6c8f8c72d206"
+  },
+  "verifiedAt": "2026-10-02T21:12:35.824Z",
+  "sourcePath": "src/client/progress-transport.js",
+  "localPath": "src/progress/shared-progress-transport.js",
+  "sha256": "9edfe701a45da206ad2b3da120329e5a0571828f89976bc7eb51f6bead87298d"
+}
