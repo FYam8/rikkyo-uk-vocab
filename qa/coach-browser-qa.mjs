@@ -146,7 +146,9 @@ try{
    const check=await restored.evaluate(mode=>{state.settings.mode=mode;return filterPool(mode).map(v=>v.id)},mode);assert.ok(Array.isArray(check));
  }
  const unlimited=await fresh();await start(unlimited,'random','0');assert.equal(await unlimited.evaluate(()=>session.unlimited),true);
- const pool=new Set();for(let i=0;i<12;i++){const q=await answer(unlimited);assert.ok(!pool.has(q.id));pool.add(q.id);await unlimited.click('#nextBtn')}
+ const recent=[],recentWindow=await unlimited.evaluate(()=>WASEDA_PLANNING_POLICY.unlimitedRecentWindow);
+ assert.equal(recentWindow,6,'Pinned upstream unlimited repetition window');
+ for(let i=0;i<12;i++){const q=await answer(unlimited);assert.ok(!recent.slice(-recentWindow).includes(q.id));recent.push(q.id);await unlimited.click('#nextBtn')}
  // Production service worker must cache the dynamically loaded full runtime.
  const offlineContext=await isolatedContext();const offline=await offlineContext.newPage();offline.on('pageerror',e=>errors.push(e.message));
  await offline.goto(url);await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
