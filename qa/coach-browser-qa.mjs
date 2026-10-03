@@ -75,8 +75,8 @@ try{
  await reference.evaluate(({raw,data})=>{
    window.__reference=new Function('window','document','localStorage',`const VOCAB=${JSON.stringify(data.vocab)},CLOZE=${JSON.stringify(data.cloze)},META=${JSON.stringify(data.meta)},TOP100=${JSON.stringify(data.top)},EXAM_EXAMPLES=${JSON.stringify(data.examples)};${raw};return {run: function(){${''}state=defaultState();now=()=>1900000000000;saveState=()=>{};let result=[];const oldRandom=Math.random;Math.random=()=>.51;for(const v of VOCAB.slice(0,8)){for(let i=0;i<8;i++){v75ApplyMainOutcome(v,{outcome:i===2?'miss':'got',qType:i<3?'choice':'reverse',questionInstanceId:v.id+'-'+i});result.push({p:JSON.parse(JSON.stringify(getProgress(v.id))),type:chooseType(v,false),score:schedulerScore(v,'recommended')});}}Math.random=oldRandom;return result;}}`)(window,document,{getItem:()=>null,setItem:()=>{},removeItem:()=>{}});
  },{raw,data});
- await reference.clock.install({time:1900000000000});await reference.clock.pauseAt(1900000000000);
- await p.clock.install({time:1900000000000});await p.clock.pauseAt(1900000000000);
+ await reference.clock.setFixedTime(1900000000000);
+ await p.clock.setFixedTime(1900000000000);
  const expected=await reference.evaluate(()=>window.__reference.run());
  const actual=await p.evaluate(()=>{
    const prior=state,priorNow=now,priorSave=saveState,priorRandom=Math.random;state=defaultState();now=()=>1900000000000;saveState=()=>{};Math.random=()=>.51;
