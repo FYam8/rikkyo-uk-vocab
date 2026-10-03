@@ -84,7 +84,7 @@ shell=shell.slice(0,shell.lastIndexOf('<script>'));
 shell=adaptSource(shell).replaceAll('2019–2026','2024–2026')
   .replace('通常学習・基礎診断・75点挑戦・参照のみの4層。基礎診断語は初回客観テストに正解すれば反復を大幅に減らし、参照語（日本語注釈付き・年度固有テーマ語など）は検索できますが通常クイズには出しません。','立教FY24–FY26の英語A/Bを統合。初めての語は4択から始め、習熟度に応じて入力・文脈・音声問題へ進みます。');
 // Keep generated pages out of search without changing the pinned upstream shell.
-shell=shell.replace(/<meta\\s+name=["'](?:robots|googlebot)["'][^>]*>\\s*/gi,'');
+shell=shell.replace(/<meta\s+name=["'](?:robots|googlebot)["'][^>]*>\s*/gi,'');
 shell=shell.replace('</head>',"<meta name=\"robots\" content=\"noindex,nofollow,noarchive,nosnippet,noimageindex\">\n<meta name=\"googlebot\" content=\"noindex,nofollow,noarchive,nosnippet,noimageindex\">\n</head>");
 shell=shell.replace('</head>','<link rel="manifest" href="/rikkyo-uk-vocab/manifest.webmanifest">\n</head>');
 shell=shell.replaceAll('4層適応学習','適応学習').replaceAll('学習4層・重要度','教材区分・重要度')
