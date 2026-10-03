@@ -1,38 +1,28 @@
 # 立教英国 Vocabulary Coach
 
-立教英国学院入試向けの過去問分析型英単語学習Webアプリです。早稲田単語アプリとは別repositoryとして運用しています。
+[公開アプリ](https://fyam8.github.io/rikkyo-uk-vocab/)
 
-## 公開版
+## 現在動作しているアプリ
 
-FY24〜FY26の英語6冊を再監査し、本文注釈語・定型指示・初歩語の過大評価を除いて再選定したCore 241をGitHub Pagesへ自動公開します。
+現行は4.0.0の早稲田アプリ移植版です。src/coach/bootstrap.jsを入口に、vendor/wasedaの出題・採点・習得・復習・画面処理を使います。waseda-app.lock.jsonに固定した早稲田の16ファイルをCIで照合します。
 
-- Core release: **241 entities**
-- Stable-ID Registry: **912 IDs**（旧801 IDをすべて保持）
-- Data version: **0.24.0-lexical**
-- Difficulty bands: **Foundation 30 / Core 151 / Challenge 60**
-- Difficulty policy: 得点層ではなく語彙そのものの難度で区分し、過去問テーマから転移語彙を補充
-- Scheduler: **FSRS-6 / ts-fsrs 5.4.2 / desired retention 0.90 / fuzz off / short-term FSRS off**
-- Memory key: **stableId × skillKey**
-- Learning lanes: **learning / relearning / provisional / review / acquisition**
-- Initial diagnostic: **maximum 24 questions**
-- Storage: **IndexedDB + Single Writer fencing**
-- Recovery: **Export / Import / Browser Backup / Restore / Reset generation**
-- Session: **questionInstanceId duplicate-grade protection + resumable session state**
+- 学習語彙：241語（Foundation 30 / Core 151 / Challenge 60）
+- 語彙データ：FY24〜FY26 A/Bを基に選定。stable IDを維持
+- 例文：241語すべてに例文と日本語訳。原文対応132、練習例文109
+- 記憶モデル：早稲田7.6の安定度・難度によるモデル
+- 復習：誤答15分後、同一セッションでの再正解は翌日。その後は元の更新規則
+- 保存：立教専用localStorageの版管理付きbundle。複数タブの古い書込みを防止
+- 復元：旧v3と現行v4のExport/Import。旧IndexedDBの記録・退役語の履歴を保持
+- Cloud：立教専用の共通進捗基盤へ件数・習得状態・学習日時を送信。答案全文は送らない
 
-公開URL: https://fyam8.github.io/rikkyo-uk-vocab/
+復習期限は出題の重み付けにも使われます。期限前の単語が絶対に再出題されない仕様ではありません。現在の画面には単独のResetボタンはありません。
 
-## 公開境界
+## 旧実装との区別
 
-公開artifactには学習に必要な公開可能フィールドだけを含めます。過去問PDF、raw evidence、source-derived example textは含めません。stable IDは再発行しません。
+リポジトリ内のFSRS実装、旧TypeScript画面、旧フォーマット定数は、過去のバックアップとの互換性や履歴検証用です。現在の画面を動かすスケジューラではありません。旧資料のPhase 22、初期診断24問、FSRS-6の説明は旧版の仕様です。
 
-## Release checks
+詳しい実装境界は[早稲田版との対応](docs/waseda-parity.md)、Cloudの保存境界は[共通進捗連携](docs/shared-progress-integration.md)を参照してください。
 
-Pages workflowは公開前に次を検証します。
+## 検証
 
-- 241 / 241 Core entity
-- 912 / 912 stable-ID Registry（旧IDの削除・再利用なし）
-- TypeScript production build
-- automated tests
-- adaptive queue / short-term learning / diagnostic policy
-
-現在の公開版はPhase 22 Core 241 adaptive buildです。
+型検査・自動テスト・固定した元コードとの照合に加え、同じ語彙・時刻・乱数を使った64件の実処理比較、回答・再開・例文・復習・旧履歴移行・Export/Importをブラウザで検証します。スマホ幅の検査は実機Safariの検査とは区別します。習得表示や目標保持率は、本人の長期的な学習効果を実測した結果ではありません。
