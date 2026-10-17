@@ -5,7 +5,6 @@ import path from 'node:path';
 const read = p => readFile(p, 'utf8');
 const lock = JSON.parse(await read('waseda-app.lock.json'));
 const enrichment = JSON.parse(await read('public/data/enrichment.json'));
-const translations = JSON.parse(await read('src/coach/source-translations.json'));
 const rows = Object.values(enrichment.entities);
 const registry=JSON.parse(await read('public/data/registry.json'));
 const manifest=JSON.parse(await read('public/data/manifest.json'));
@@ -15,7 +14,7 @@ const vocab = rows.map(e => ({
   id:e.stableId, word:e.lemma, meaning:e.meaningJa, representativeMeaning:e.meaningJa,
   pos:({noun:'n.',verb:'v.',adjective:'adj.',adverb:'adv.'}[posById.get(e.stableId)]||posById.get(e.stableId)||'phrase'), priority:e.priority,
   level:{Foundation:60,Core:70,Challenge:75}[e.targetBand],
-  studyLayer:e.studyLayer, sourceScope:e.sourceScope, paperCount:e.paperCount,
+  studyLayer:e.studyLayer, ordinaryEligible:e.observedFrequency>0, sourceScope:e.sourceScope, paperCount:e.paperCount,
   observedYears:e.observedYears, evidence:e.evidence, questionTargetEvidence:e.questionTargetEvidence, glossedInSource:e.glossedInSource,
   frequency:e.observedFrequency, surfaceFrequency:e.observedFrequency,
   yearCount:e.years.length, years:e.years, surfaceYears:e.observedYears,
@@ -29,15 +28,8 @@ const examples={}, cloze={};
 for(const e of rows){
   const ex=e.sourceExample, gen=e.generatedExample;
   if(ex){
-    if(!translations[ex.sentence])throw new Error('Translation missing: '+e.lemma);
-    // The legacy excerpt starts halfway through a quotation. Use the following
-    // complete sentence when it still contains the target form.
-    const prefix='It may grow." ';
-    let sentence=ex.sentence, ja=translations[sentence];
-    if(sentence.startsWith(prefix)&&sentence.slice(prefix.length).toLowerCase().includes(ex.matchedForm.toLowerCase())){
-      sentence=sentence.slice(prefix.length);ja=translations[sentence];
-    }
-    examples[e.stableId]={...ex,sentence,ja,source:`英語${ex.schedule} 問題冊子`,mode:'exact'};
+    if(!ex.ja)throw new Error('Translation missing: '+e.lemma);
+    examples[e.stableId]={...ex,source:`英語${ex.schedule} 問題冊子`,mode:'exact'};
   }else if(gen){
     examples[e.stableId]={sentence:gen.sentence,ja:gen.ja,year:'',source:'練習用例文',matchedForm:e.lemma,mode:'generated',note:'過去問の引用ではなく、立教の出題傾向から作成した練習文です。'};
   }else throw new Error('Example missing: '+e.lemma);
@@ -53,9 +45,9 @@ const meta={
   method:'FY24–FY26 英語A/Bを統合。立教の教材を早稲田と同じ出題・記憶モデルで学習。',
   auditStatus:'6冊の本文・設問を集計・和訳付き',rawCandidateEntries:registry.length,
   registeredWords:vocab.filter(v=>v.sourceType==='word').length,registeredPhrases:vocab.filter(v=>v.sourceType==='phrase').length,
-  learnableTotal:vocab.length,registeredTotal:vocab.length,directVocabCount:'未集計',glossedReferenceCount:0,
+  learnableTotal:vocab.filter(v=>v.ordinaryEligible).length,registeredTotal:vocab.length,directVocabCount:'未集計',glossedReferenceCount:0,
   verifiedEvidenceEntries:rows.filter(e=>e.evidence.length).length,
-  layerCounts:{core:count('core'),diagnostic:0,challenge:count('challenge'),reference:0},
+  layerCounts:{core:count('core'),diagnostic:0,challenge:count('challenge'),reference:count('reference')},
   frequencySourceFiles:[2024,2025,2026].flatMap(y=>['A','B'].map(s=>`FY${String(y).slice(-2)} 英語${s} 問題冊子`)),
   auxiliaryAnswerFiles:[],missing:['公式解答・リスニング音源は本教材に含めていません。'],
 };

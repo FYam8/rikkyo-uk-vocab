@@ -1,4 +1,4 @@
-# Waseda complete application transplant (Rikkyo 4.0.0)
+# Waseda complete application transplant (Rikkyo 4.2.0)
 
 Baseline: FYam8/english-vocab commit `6f4788386a1935d6e2703c694257c1f327b0f831`.
 Only the Rikkyo repository is changed. No executable code is hotlinked from Waseda.
@@ -10,7 +10,7 @@ Only the Rikkyo repository is changed. No executable code is hotlinked from Wase
 all 16 files directly against that revision. `tools/prepare-coach.mjs` assembles
 these modules in the original order with Rikkyo's corpus. The original question
 selection, distractors, grading, objective mastery, retry queue, memory curve,
-feedback, example renderer, list, statistics, analysis, settings and navigation
+feedback, list, statistics, analysis, settings and navigation
 are the running implementation, rather than separate TypeScript reimplementations.
 
 The 7.6 memory model uses `.9 ** (elapsedDays / stabilityDays)`. Its policy targets
@@ -28,14 +28,18 @@ export metadata are in `public/release-manifest.json` and the coach host.
 ## Narrow school and device adaptations
 
 - Rikkyo name, 2024–2026 corpus, Foundation/Core/Challenge membership, priorities,
-  frequencies and stable IDs. All 241 items have an example and full Japanese
-  translation; 132 use source-matched excerpts, 109 clearly labelled practice
-  examples. Translations of source excerpts are in `source-translations.json`.
-- The ten category labels requested by the user remain. Foundation/Core/Challenge
+  frequencies and stable IDs. All 426 items have bilingual examples: 309 printed
+  targets plus 5 inferred grammar targets use reviewed original excerpts/tasks;
+  112 extension entries have clearly labelled generated practice examples. The
+  school feedback renderer preserves `tools/data/original-excerpts.tsv` verbatim
+  and identifies gaps, rearrangement, error-correction tasks and PDF references.
+- The ten ordinary categories remain and an explicit optional category is added. Foundation/Core/Challenge
   map to the upstream 60/70/75 pools. The retained exam category uses the upstream
   default normal-learning pool; it does not introduce a second scheduler.
-- Rikkyo currently supplies no diagnostic/reference-layer items. Explanatory text
-  does not falsely claim that its dataset has Waseda's four populated layers.
+- All 117 zero-frequency entries use the reference layer, excluded by upstream
+  ordinary planners and distractors. A school filter supplies them only to the
+  explicit optional mode; scheduling and memory calculations remain upstream.
+  Session validation permits reference targets only for that opt-in mode.
 - Audio can be disabled or replaced by text if the device cannot play speech.
 - Storage and backups use only Rikkyo namespaces. Extra settings expose old and
   new device backups. Waseda localStorage keys are never read or written.

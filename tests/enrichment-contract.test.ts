@@ -21,7 +21,7 @@ describe("FY24-FY26 A/B enrichment contract", () => {
     for (const item of Object.values(enrichment.entities) as any[]) {
       if (item.generatedExample) expect(item.generatedExample.provenance).toBe("generated-from-rikkyo-patterns");
       if (item.generatedExample) expect(item.generatedExample.ja).not.toContain("使い方を文脈で確認する例文です");
-      if (item.sourceExample) expect(item.evidence.length).toBeGreaterThan(0);
+      if (item.sourceExample) expect(item.evidence.length + item.questionTargetEvidence.length).toBeGreaterThan(0);
     }
   });
 
@@ -46,10 +46,14 @@ describe("FY24-FY26 A/B enrichment contract", () => {
 
   it("rejects OCR boundary and sense-mismatch examples", () => {
     const byLemma = new Map((Object.values(enrichment.entities) as any[]).map((item) => [item.lemma, item]));
-    for (const lemma of ["energy", "leave", "order", "support", "up to"]) {
+    for (const lemma of ["order", "up to"]) {
       expect(byLemma.get(lemma)?.sourceExample).toBeNull();
       expect(byLemma.get(lemma)?.cloze?.provenance).toBe("generated-from-rikkyo-patterns");
     }
+    expect(byLemma.get("leave")?.sourceExample.sentence).toBe("Then the hunter climbed down the tree with his net and left.");
+    expect(byLemma.get("energy")?.sourceExample.sentence).toBe("Energy sources");
+    expect(byLemma.get("energy")?.cloze).toBeNull();
+    expect(byLemma.get("support")?.sourceExample.kind).toBe("question");
     for (const item of Object.values(enrichment.entities) as any[]) {
       expect(item.sourceExample?.sentence ?? "").not.toMatch(/Writing Test|\( B-[1-4] \)|Tomorrow Saturday/);
       expect(item.cloze?.sentence ?? "").not.toMatch(/Writing Test|\( B-[1-4] \)|Tomorrow Saturday/);

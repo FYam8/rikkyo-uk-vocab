@@ -5,6 +5,9 @@
   "printedMatches": 309,
   "grammarTargetsOnly": 5,
   "extension": 112,
+  "ordinaryEligible": 309,
+  "optionalOnly": 117,
+  "originalExampleEntityCount": 314,
   "phrases": 43,
   "bands": {
     "Foundation": 41,

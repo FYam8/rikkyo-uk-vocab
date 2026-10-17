@@ -1,7 +1,7 @@
 /* School data labels, device capabilities and the legacy persistence boundary.
    No scoring, mastery, forgetting-curve, distractor or session algorithms here. */
 MODE_OPTIONS.splice(0,MODE_OPTIONS.length,
-  ['recommended','おすすめ学習'],['exam','実戦トレーニング'],['60','基礎重点'],['70','Core重点'],['75','発展・Challenge重点'],
+  ['recommended','おすすめ学習'],['exam','実戦トレーニング'],['60','基礎重点'],['70','Core重点'],['75','過去問Challenge重点'],['optional','追加の語彙（任意）'],
   ['unlearned','未学習'],['weak','苦手'],['review','復習期限'],['frequent','頻出語'],['random','ランダム']);
 const RIKKYO_MODE_MAP={foundation:'60',core:'70',challenge:'75'};
 const RIKKYO_KIND_MAP={meaningChoice:'choice',reverseChoice:'reverseChoice',input:'reverse',audioChoice:'audioChoice',audioInput:'audio',clozeChoice:'cloze',clozeInput:'cloze'};
@@ -79,26 +79,48 @@ if(!window.RikkyoHost.get(STORAGE_KEY)){
 
 window.RikkyoMergeBackup=function(incoming,active){
   if(session&&session.active||loadActiveSession())throw new Error('途中セッションを終了してから読み込んでください。');
-  if(active&&!validateActiveSession(active))throw new Error('途中セッションの単語IDを確認できません。');
+  if(active&&!validateActiveSession(active)){
+    const ids=[...(active.baseQueueIds||[]),...(active.candidatePoolIds||[]),...(active.currentQuestion?[active.currentQuestion.wordId,...(active.currentQuestion.choiceIds||[])]:[])];
+    if(ids.some(id=>!VOCAB_BY_ID.has(id)))throw new Error('途中セッションの単語IDを確認できません。');
+    active=null;showToast('履歴を読み込み、以前の出題は終了しました。追加語は任意モードで学習できます。');
+  }
   mergeImported({app:'立教英国学院 Vocabulary Coach',state:incoming});
   if(active){wasedaStorageSet(V75_ACTIVE_SESSION_KEY,JSON.stringify({...active,dataVersion:META.dataVersion}));location.reload()}
 };
 exportData=function(){if(session&&session.active)persistActiveSession();window.RikkyoHost.export().catch(e=>showToast(e.message,{kind:'error'}))};
 handleImport=function(file){file.text().then(JSON.parse).then(raw=>window.RikkyoHost.import(raw)).catch(e=>showToast(e.message,{kind:'error'}))};
 
-// Keep the upstream renderer and its English + full Japanese translation.
-// Generated Rikkyo examples must not be labelled as past-paper quotations.
+// Source text stays byte-for-byte identical to the reviewed excerpt bank.
 const rikkyoExampleRenderer=examExampleHTML;
 examExampleHTML=function(v){
-  const html=rikkyoExampleRenderer(v);
-  return EXAM_EXAMPLES[v.id]?.mode==='generated'?html.replace('過去問例文 · 年度 練習用例文','練習例文').replace(/同年度の検証済み例文レコードが未登録のため、代表例として年度の実例を表示しています。/g,'同年度の原文例文が未登録のため、練習用に作成した例文を表示しています。'):html;
+ const ex=EXAM_EXAMPLES[v.id];
+ if(ex?.mode!=='exact')return rikkyoExampleRenderer(v).replace('過去問例文 · 年度 練習用例文','練習例文').replace(/同年度の検証済み例文レコードが未登録のため、代表例として年度の実例を表示しています。/g,'同年度の原文例文が未登録のため、練習用に作成した例文を表示しています。');
+ const labels={reading:'本文',notice:'案内・メッセージ',grammar:'文法問題',question:'設問・選択肢','listening-question':'リスニングの設問・選択肢（紙面）',writing:'英作文の課題',gapped:'空欄を含む原題',reorder:'語句整序の原題','error-correction':'誤り訂正の原題'};
+ const notes={'error-correction':'誤りを含む訂正前の原題です。正しい完成文の例ではありません。',reorder:'語順と選択語を原題のまま掲載しています。',gapped:'空欄を補わず、原題のまま掲載しています。'};
+ let note=notes[ex.kind]||'';
+ if(ex.inferredTarget)note+=' 見出し語の完成形は原題に印刷されていません。';
+ const selectedYear=v75SelectedYear();
+ if(selectedYear!=='all'&&selectedYear!=null&&Number(selectedYear)!==ex.year)note+=` 表示している原文は${ex.year}年度です。年度指定は出題語の抽出条件です。`;
+ if(v.word==='support')note+=' この原文の support は名詞「支援」として使われています。';
+ const raw=ex.sentence,form=ex.matchedForm||'',i=form?raw.toLowerCase().indexOf(form.toLowerCase()):-1;
+ const sentence=i<0?esc(raw):esc(raw.slice(0,i))+`<b>${esc(raw.slice(i,i+form.length))}</b>`+esc(raw.slice(i+form.length));
+ return `<div class="exam-example"><div class="exam-example-head">過去問原文（${esc(labels[ex.kind]||'本文')}） · ${ex.year}年度 英語${esc(ex.schedule)}・PDF p.${ex.page}</div><div class="exam-example-sentence">${sentence}</div><div class="exam-example-ja"><span class="exam-example-ja-label">和訳</span>${esc(ex.ja)}</div>${note?`<div class="exam-example-note">${esc(note)}</div>`:''}</div>`;
 };
+function rikkyoOptionalLabels(root){
+ for(const node of root?.querySelectorAll('.l')||[]){
+  if(node.textContent==='参照のみ')node.textContent='追加学習（任意）';
+  if(node.textContent==='75点挑戦')node.textContent='過去問Challenge';
+ }
+}
+const rikkyoStatsRenderer=renderStats;
+renderStats=function(){rikkyoStatsRenderer();rikkyoOptionalLabels($('statsGrid'))};
 const rikkyoAnalysisRenderer=renderAnalysis;
 renderAnalysis=function(){
   rikkyoAnalysisRenderer();
   const note=document.getElementById('analysisCandidateNote');if(note)note.textContent=`固定ID台帳は${META.rawCandidateEntries}件、学習対象は${VOCAB.length}項目です。過去問の出題語と発展語を区別して収録しています。`;
   const help=$('evidenceCountHelp');if(help)help.textContent='回数は6冊の本文・設問・選択肢の転記を集計。活用形をまとめ、共通指示・解答例・日本語注釈欄・未入手の音声は除外しています。語句整序の完成形を推定した項目は回数に加えません。';
-  const description=$('analysisCounts').querySelector('.small.muted');if(description)description.textContent='通常学習とChallengeの教材区分は立教データに基づきます。出題優先度・再確認・習熟度・忘却曲線は早稲田と同じ処理です。';
+  rikkyoOptionalLabels($('analysisCounts'));
+  const description=$('analysisCounts').querySelector('.small.muted');if(description)description.textContent='通常モードは冊子で出現した309項目、追加学習（任意）は未出現・完成形未掲載の117項目が対象です。出題優先度・再確認・習熟度・忘却曲線は早稲田と同じ処理です。';
 };
 
 // Device-only capability fallback. The selected type still comes from the
@@ -123,7 +145,7 @@ init=function(){
   rikkyoInit();
   const settings=$('view-settings');
   const card=document.createElement('div');card.className='card';
-  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.1.1 · 早稲田 Vocabulary Coach v7.6</p>';
+  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.2.0 · 早稲田 Vocabulary Coach v7.6</p>';
   settings.append(card);$('audioQuestions').value=state.settings.audioQuestions||'auto';
   $('audioQuestions').onchange=e=>{state.settings.audioQuestions=e.target.value;markSettingsUpdated();saveState()};
   async function showBackups(){
@@ -138,7 +160,8 @@ init=function(){
 };
 
 // School-owned provenance presentation; no change to shared learning policy.
-LAYER_LABEL.challenge='発展・Challenge';
+LAYER_LABEL.challenge='過去問Challenge';
+LAYER_LABEL.reference='追加学習（任意）';
 const rikkyoBadges=badgeHTML;
 badgeHTML=function(v){
  const source=v.sourceScope==='extension'?'発展語':v.frequency?'過去問出現語':'文法の出題対象';
@@ -157,8 +180,35 @@ v75EvidenceDetail=function(v){
 const rikkyoCoverageInit=init;
 init=function(){
  rikkyoCoverageInit();
- const past=VOCAB.filter(v=>v.sourceScope==='past-paper').length,extension=VOCAB.length-past;
+ const past=VOCAB.filter(v=>v.ordinaryEligible).length,extension=VOCAB.length-past;
  const intro=document.createElement('p');intro.className='small muted';intro.id='coverageSummary';
- intro.textContent=`${VOCAB.length}項目：過去問の出題語${past}・発展語${extension}。おすすめ学習は出題語を優先し、発展語は「発展・Challenge重点」で学習できます。`;
+ intro.textContent=`通常学習は、冊子で出現を確認した${past}項目が対象です。未出現・完成形未掲載の${extension}項目は「追加の語彙（任意）」を選んだ場合だけ出題します。登録は計${VOCAB.length}項目です。`;
  $('view-learn').prepend(intro);
+};
+
+// School-owned curriculum opt-in. Reference entries are excluded by the
+// unmodified shared planner AND distractor generator in all ordinary modes.
+const rikkyoFilterPool=filterPool;
+filterPool=function(mode,year){
+ return mode==='optional'?VOCAB.filter(v=>!v.ordinaryEligible):rikkyoFilterPool(mode,year);
+};
+const rikkyoValidateSession=validateActiveSession;
+validateActiveSession=function(saved){
+ if(saved?.mode!=='optional'){
+   const ids=[...(saved?.baseQueueIds||[]),...(saved?.candidatePoolIds||[]),...(saved?.generatedBaseIds||[]),...(saved?.retryQueue||[]).map(x=>x.wordId),...(saved?.currentQuestion?[saved.currentQuestion.wordId,...(saved.currentQuestion.choiceIds||[])]:[])];
+   if(ids.some(id=>!VOCAB_BY_ID.get(id)?.ordinaryEligible))return false;
+   return rikkyoValidateSession(saved);
+ }
+ const ids=[...(saved.baseQueueIds||[]),...(saved.candidatePoolIds||[]),...(saved.generatedBaseIds||[]),...(saved.retryQueue||[]).map(x=>x.wordId),...(saved.currentQuestion?[saved.currentQuestion.wordId]:[])];
+ return ids.every(id=>VOCAB_BY_ID.has(id)&&!VOCAB_BY_ID.get(id).ordinaryEligible)&&rikkyoValidateSession({...saved,baseQueueIds:[],candidatePoolIds:[]});
+};
+const rikkyoOptionalInit=init;
+init=function(){
+ rikkyoOptionalInit();
+ const updateYear=()=>{
+   const optional=state.settings.mode==='optional';$('learnYearSelect').disabled=optional;
+   const help=$('yearExampleHelp');if(help)help.textContent=optional?'追加の語彙は年度を指定せずに学習します。':'年度指定は、その年度に出現した語の抽出条件です。原文の年度・日程・PDFページは回答後に表示します。';
+ };
+ const hydrate=hydrateUiFromState;hydrateUiFromState=function(){hydrate();updateYear()};
+ $('modeSelect').addEventListener('change',updateYear);updateYear();
 };

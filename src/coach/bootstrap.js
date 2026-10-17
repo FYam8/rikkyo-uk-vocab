@@ -44,7 +44,7 @@ async function boot(){
   // question across this data-only expansion instead of letting upstream init
   // discard it merely because the dataset label changed.
   const pending=parse(bundle.records[SESSION]);
-  if(pending&&['rikkyo-2024-2026-waseda-v7.6','0.24.0-lexical'].includes(pending.dataVersion)){
+  if(pending&&['rikkyo-2024-2026-waseda-v7.6','0.24.0-lexical','0.25.0-coverage'].includes(pending.dataVersion)){
     const ids=new Set(Object.keys(WORD_TIERS));
     const referenced=[...(pending.baseQueueIds||[]),...(pending.candidatePoolIds||[]),...(pending.generatedBaseIds||[]),...(pending.currentQuestion?[pending.currentQuestion.wordId]:[])];
     if(referenced.every(id=>ids.has(id)))commit({...bundle,records:{...bundle.records,[SESSION]:JSON.stringify({...pending,dataVersion:curriculum.dataVersion})}});
@@ -82,7 +82,7 @@ async function boot(){
         const old=await verifyEnvelope(raw);await archive(raw);
         ({state:incoming,session:active}=window.RikkyoConvertLegacy(old));
       }else{
-        if(raw.appId!=='rikkyo-uk-vocab'||raw.exportFormat!==FORMAT||raw.engineVersion!=='waseda-vocabulary/7.6'||!['0.24.0-lexical',curriculum.dataVersion].includes(raw.datasetVersion))throw new Error('別アプリまたは未対応のバックアップです');
+        if(raw.appId!=='rikkyo-uk-vocab'||raw.exportFormat!==FORMAT||raw.engineVersion!=='waseda-vocabulary/7.6'||!['0.24.0-lexical','0.25.0-coverage',curriculum.dataVersion].includes(raw.datasetVersion))throw new Error('別アプリまたは未対応のバックアップです');
         const {checksum,...body}=raw;if(await digest(body)!==checksum)throw new Error('バックアップの検証に失敗しました');
         incoming=raw.state;active=raw.activeSession;
         if(!incoming||incoming.schemaVersion!==7||!incoming.words)throw new Error('学習履歴の形式が不正です');

@@ -1,12 +1,12 @@
 {
   "appId": "rikkyo-uk-vocab",
-  "productVersion": "4.1.1",
+  "productVersion": "4.2.0",
   "engineVersion": "waseda-vocabulary/7.6",
-  "datasetVersion": "0.25.0-coverage",
+  "datasetVersion": "0.26.0-originals",
   "persistenceSchemaVersion": 3,
   "exportFormatVersion": 4,
   "indexedDbVersion": 3,
   "commonEngineCommit": "6f4788386a1935d6e2703c694257c1f327b0f831",
-  "enrichmentVersion": "2026-10-17-paper-coverage-v5",
+  "enrichmentVersion": "2026-10-17-original-excerpts-v6",
   "learningStateSchemaVersion": 7
 }

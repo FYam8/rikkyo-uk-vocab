@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {originalExcerpts} from './original-excerpts.mjs';
 import {evidenceFor,priorityFor} from './coverage-policy.mjs';
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const manifest=read('public/data/manifest.json'),release=read('public/release-manifest.json');
@@ -23,8 +24,17 @@ for(const row of rows){
  assert.equal(e.observedFrequency,e.evidence.reduce((n,x)=>n+x.count,0),e.lemma);
  assert.equal(e.paperCount,new Set(e.evidence.map(x=>x.year+'-'+x.schedule)).size);
  assert.equal(e.sourceScope,e.observedFrequency||e.questionTargetEvidence.length?'past-paper':'extension');
- if(e.sourceScope==='extension'){assert.equal(e.priority,'C');assert.equal(e.studyLayer,'challenge');assert.equal(e.sourceExample,null);}
+ if(e.sourceScope==='extension'){assert.equal(e.priority,'C');assert.equal(e.studyLayer,'reference');assert.equal(e.sourceExample,null);}
  assert.equal(e.priority,priorityFor({frequency:e.observedFrequency,paperCount:e.paperCount,yearCount:e.observedYears.length,directTarget:!!e.questionTargetEvidence.length,glossOnly:e.glossedInSource}));
+ assert.equal(row[8],e.observedFrequency>0);assert.equal(row[9],e.observedFrequency>0);
+ assert.equal(e.studyLayer==='reference',e.observedFrequency===0);
+ if(e.observedFrequency>0)assert.ok(e.sourceExample,'Missing original: '+e.lemma);
+ if(e.sourceExample){
+   const ex=e.sourceExample,original=originalExcerpts.find(x=>x.excerptId===ex.excerptId);
+   assert.ok(original,e.lemma);assert.equal(ex.sentence,original.sentence,e.lemma);assert.equal(ex.ja,original.ja,e.lemma);
+   assert.equal(ex.pdfSha256,corpus.papers.find(p=>p.key===ex.paperKey).pdfSha256);
+   assert.equal(ex.provenance,'past-paper-verbatim');
+ }
  assert.ok(e.sourceExample||e.generatedExample);
  assert.ok(e.generatedExample?.ja||e.sourceExample);
 }
