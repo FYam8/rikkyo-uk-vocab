@@ -17,7 +17,7 @@ async function fresh(){
  // A new bootstrap must request the dataset-qualified runtime instead.
  await context.route('**/assets/coach-runtime.js*',route=>{
    const requested=new URL(route.request().url());
-   if(requested.searchParams.get('dataset')==='0.26.0-originals'&&requested.searchParams.get('release')==='4.2.0')return route.continue();
+   if(requested.searchParams.get('dataset')==='0.26.0-originals'&&requested.searchParams.get('release')==='4.3.0')return route.continue();
    return route.fulfill({contentType:'application/javascript',body:'throw new Error("stale unqualified runtime requested")'});
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -38,7 +38,7 @@ async function answer(p,ok=true){
 }
 try{
  const p=await fresh();
- const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.2.0');
+ const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.3.0');
  assert.equal(await p.locator('#modeSelect option').count(),11);
  const curriculum=JSON.parse(await readFile('public/data/manifest.json','utf8'));
  assert.equal(tuple.datasetVersion,curriculum.dataVersion);
@@ -106,6 +106,7 @@ try{
  const reference=await fresh();
  const lock=JSON.parse(await readFile('waseda-app.lock.json','utf8'));
  let raw='';for(const name of lock.runtimeOrder)raw+=await readFile('vendor/waseda/'+name,'utf8')+'\n';
+ raw+='\n'+await readFile('src/common-engine/delayed-retention.js','utf8');
  const data=await p.evaluate(()=>({vocab:VOCAB,cloze:CLOZE,meta:META,top:TOP100,examples:EXAM_EXAMPLES}));
  await reference.goto('about:blank');
  await reference.setContent('<html><body></body></html>');
@@ -121,7 +122,29 @@ try{
    const prior=state,priorNow=now,priorSave=saveState,priorRandom=Math.random;state=defaultState();now=()=>1900000000000;saveState=()=>{};Math.random=()=>.51;
    const result=[];for(const v of VOCAB.slice(0,8))for(let i=0;i<8;i++){v75ApplyMainOutcome(v,{outcome:i===2?'miss':'got',qType:i<3?'choice':'reverse',questionInstanceId:v.id+'-'+i});result.push({p:JSON.parse(JSON.stringify(getProgress(v.id))),type:chooseType(v,false),score:schedulerScore(v,'recommended')})}
    state=prior;now=priorNow;saveState=priorSave;Math.random=priorRandom;return result;
- });assert.deepEqual(actual,expected,'Memory, mastery, type progression and scheduler differ from upstream');
+ });assert.deepEqual(actual,expected,'Memory, mastery, type progression and scheduler differ from the pinned runtime with delayed-retention policy');
+ // Exercise the policy in the shipped script with persistence, reload and backup.
+ const retention=await fresh();
+ const retentionState=await retention.evaluate(()=>{
+   const v=VOCAB.find(v=>v.ordinaryEligible),base=Date.now(),realNow=now;
+   let tick=base;now=()=>tick;
+   const score=(offset,ok=true,type='reverse',isRetry=false)=>{tick=base+offset;return JSON.parse(JSON.stringify(v75ApplyMainOutcome(v,{outcome:ok?'got':'miss',qType:type,isRetry,questionInstanceId:crypto.randomUUID()})))};
+   const miss=score(0,false,'choice'),retry=score(600000,true,'choice',true),practice=score(1200000);
+   const day=score(1200000+86400000),secondDay=score(1200000+2*86400000);
+   now=realNow;return {id:v.id,miss,retry,practice,day,secondDay};
+ });
+ assert.equal(retentionState.retry.evidence,retentionState.miss.evidence);
+ assert.equal(retentionState.retry.memoryModel.stabilityDays,retentionState.miss.memoryModel.stabilityDays);
+ assert.equal(retentionState.practice.nextReview,retentionState.retry.nextReview);
+ assert.equal(retentionState.day.retentionEvidence.confirmations,1);
+ assert.equal(retentionState.secondDay.retentionEvidence.confirmations,2);
+ assert.ok(retentionState.secondDay.mastery>retentionState.practice.mastery);
+ await retention.reload();await retention.waitForFunction(()=>document.getElementById('audioQuestions'));
+ assert.deepEqual(await retention.evaluate(id=>state.words[id],retentionState.id),retentionState.secondDay);
+ const retentionDownload=retention.waitForEvent('download');await retention.evaluate(()=>exportData());
+ const retentionBackup=JSON.parse(await readFile(await(await retentionDownload).path(),'utf8'));
+ const retentionRestored=await fresh();await retentionRestored.evaluate(raw=>window.RikkyoHost.import(raw),retentionBackup);
+ assert.deepEqual(await retentionRestored.evaluate(id=>state.words[id],retentionState.id),retentionState.secondDay);
  // Export and restore to a separate empty profile, including checksum rejection.
  await p.click('.nav button[data-view="settings"]');const download=p.waitForEvent('download');await p.click('#exportBtn');
  const exported=JSON.parse(await readFile(await(await download).path(),'utf8'));assert.equal(exported.exportFormatVersion,4);
@@ -235,10 +258,10 @@ try{
  const offlineContext=await isolatedContext();const offline=await offlineContext.newPage();offline.on('pageerror',e=>errors.push(e.message));
  await offline.goto(url);await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  await offline.evaluate(()=>navigator.serviceWorker.ready);
- assert.equal(await offline.evaluate(async()=>!!(await caches.match('/rikkyo-uk-vocab/assets/coach-runtime.js?release=4.2.0&dataset=0.26.0-originals'))),true);
+ assert.equal(await offline.evaluate(async()=>!!(await caches.match('/rikkyo-uk-vocab/assets/coach-runtime.js?release=4.3.0&dataset=0.26.0-originals'))),true);
  await offline.reload();
  await offline.waitForFunction(()=>navigator.serviceWorker.controller&&window.RikkyoHost&&document.getElementById('audioQuestions'));
  await offlineContext.setOffline(true);await offline.reload();await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  await start(offline);await answer(offline,true);assert.equal(await offline.evaluate(()=>state.stats.totalAnswers),1);
- assert.deepEqual(errors,[]);console.log((process.env.QA_PASS||'QA')+': full app, translated examples, resume, retries, 64 upstream memory comparisons, export/import, isolation PASS');
+ assert.deepEqual(errors,[]);console.log((process.env.QA_PASS||'QA')+': full app, translated examples, resume, retries, 64 shared-policy memory comparisons, export/import, isolation PASS');
 }finally{await browser.close()}

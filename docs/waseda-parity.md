@@ -1,4 +1,4 @@
-# Waseda complete application transplant (Rikkyo 4.2.0)
+# Waseda complete application transplant (Rikkyo 4.3.0)
 
 Baseline: FYam8/english-vocab commit `6f4788386a1935d6e2703c694257c1f327b0f831`.
 Only the Rikkyo repository is changed. No executable code is hotlinked from Waseda.
@@ -9,14 +9,15 @@ Only the Rikkyo repository is changed. No executable code is hotlinked from Wase
 `waseda-app.lock.json` records their upstream revision and byte hashes. CI compares
 all 16 files directly against that revision. `tools/prepare-coach.mjs` assembles
 these modules in the original order with Rikkyo's corpus. The original question
-selection, distractors, grading, objective mastery, retry queue, memory curve,
+selection, distractors, grading, retry queue, memory curve,
 feedback, list, statistics, analysis, settings and navigation
 are the running implementation, rather than separate TypeScript reimplementations.
 
 The 7.6 memory model uses `.9 ** (elapsedDays / stabilityDays)`. Its policy targets
 90–93% retention depending on importance and weakness. Misses are scheduled for
-15 minutes; a correct same-session retry for one day. Subsequent intervals follow
-the original stability/difficulty update. New words start with four choices;
+15 minutes; a correct short retry schedules a check one day later. The additive
+`src/common-engine/delayed-retention.js` policy controls positive mastery and
+stability gains as described below. Errors retain the original penalties. New words start with four choices;
 reverse choices, typing, cloze and audio become eligible with mastery.
 
 The earlier Rikkyo FSRS and UI source remains for legacy backup compatibility and
@@ -69,7 +70,43 @@ that previously answered words can never reappear before their review date.
 
 Browser QA compares 64 actual outcome transitions against separately evaluated
 original Waseda code with the same corpus, clock and random values. It checks
-memory, mastery, next-review dates, question types and scheduler scores, plus UI
+memory, mastery, next-review dates, question types and scheduler scores under the
+same additive delayed-retention policy, plus UI
 answers, translated feedback, resume without double scoring, finite/unlimited
 sessions, legacy migration, retired history, imports, backups and Waseda-key
 isolation. Local and production browser checks each run twice.
+
+## Delayed retention policy (v4.3.0)
+
+The pinned upstream files remain byte-identical. The build loads the reusable
+`src/common-engine/delayed-retention.js` after them, before the school adapter.
+Only this additional learning policy differs from the upstream baseline.
+
+- An initial correct answer records the normal evidence and stays at learning.
+- A correct answer less than 24 elapsed hours after the latest exposure is
+  practice: counts and recent outcomes are retained, but evidence, mastery,
+  stability and difficulty do not improve. This applies across sessions too.
+- Correct recovery after an error schedules a check 24 hours later. More short
+  practice preserves that deadline. Existing longer intervals are preserved.
+- A correct answer at least 24 hours after the latest exposure contributes twice
+  the normal evidence. Each such recall permits one further mastery stage,
+  subject to the existing evidence thresholds. Strong production formats still
+  count more than choices. Delayed recalls use the original stability growth.
+- A miss retains the original penalty and 15-minute deadline, and resets the
+  count of successful delayed recalls since the most recent miss.
+- Existing mastery is not retroactively reduced on upgrade. The optional
+  `retentionEvidence` field is written only on the next scored answer. Schema 7,
+  IDs, answer counters, due dates and old exports remain compatible. Its count
+  and timestamp survive reloads and v4 export/import.
+
+The 24-hour boundary is an explicit product rule, not a claim of a uniquely
+optimal scientific interval. Calendar midnight alone does not qualify. A short
+practice resets the exposure clock. Retry insertion still uses the upstream
+6/8-question gap and one retry per session; no new cross-session exclusion is
+introduced. Hooks adjust the result inside the original transaction, before
+its save and before session mastery notifications.
+
+Regression coverage runs the actual pinned runtime with this policy, including
+short practice, new sessions, missed retries, exact 24-hour boundaries, several
+delayed days, old state, persisted saves and restored backups. Browser checks
+also verify the assembled release and its service-worker cache.

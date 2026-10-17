@@ -1,4 +1,4 @@
-const RELEASE = "4.2.0--waseda-vocabulary-7.6--0.26.0-originals--e2026-10-17-r6--p3--cloud1";
+const RELEASE = "4.3.0--waseda-vocabulary-7.6--0.26.0-originals--e2026-10-17-r6--p3--cloud1";
 const CACHE_NAME = `rikkyo-uk-vocab-${RELEASE}`;
 const SCOPE = "/rikkyo-uk-vocab/";
 
@@ -9,7 +9,7 @@ async function buildAtomicCache() {
   if (!releaseResponse.ok || !dataResponse.ok || !indexResponse.ok) throw new Error("RELEASE_TUPLE_FETCH_FAILED");
   const release = await releaseResponse.clone().json();
   const data = await dataResponse.clone().json();
-  if (release.productVersion !== "4.2.0" || release.engineVersion !== "waseda-vocabulary/7.6" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
+  if (release.productVersion !== "4.3.0" || release.engineVersion !== "waseda-vocabulary/7.6" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
     throw new Error("RELEASE_TUPLE_MISMATCH");
   }
   const html = await indexResponse.clone().text();
