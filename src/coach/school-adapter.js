@@ -123,7 +123,7 @@ init=function(){
   rikkyoInit();
   const settings=$('view-settings');
   const card=document.createElement('div');card.className='card';
-  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.1.0 · 早稲田 Vocabulary Coach v7.6</p>';
+  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.1.1 · 早稲田 Vocabulary Coach v7.6</p>';
   settings.append(card);$('audioQuestions').value=state.settings.audioQuestions||'auto';
   $('audioQuestions').onchange=e=>{state.settings.audioQuestions=e.target.value;markSettingsUpdated();saveState()};
   async function showBackups(){

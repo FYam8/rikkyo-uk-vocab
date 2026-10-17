@@ -68,7 +68,7 @@ await write('public/data/enrichment.json',{format:'rikkyo-vocab-enrichment/v1',v
 const manifest=await read('public/data/manifest.json');
 Object.assign(manifest,{dataVersion:'0.25.0-coverage',registryVersion:'0.25.0',generatedFromPhase:25,registryEntityCount:registry.length,coreEntityCount:rows.length,enrichmentVersion:version,selectionMethod:'uncapped-reviewed-paper-coverage-and-frequency',chunks});
 await write('public/data/manifest.json',manifest);
-const release=await read('public/release-manifest.json');Object.assign(release,{productVersion:'4.1.0',datasetVersion:manifest.dataVersion,enrichmentVersion:version});await write('public/release-manifest.json',release);
+const release=await read('public/release-manifest.json');Object.assign(release,{datasetVersion:manifest.dataVersion,enrichmentVersion:version});await write('public/release-manifest.json',release);
 await writeFile('src/progress/tiers.js','// School-owned projection metadata; generated from the current curriculum.\nexport const WORD_TIERS=Object.freeze('+JSON.stringify(Object.fromEntries(rows.map(r=>[r[0],r[6]])))+');\n');
 const summary={total:rows.length,added:rows.length-baseline.rows.length,registryCount:registry.length,printedMatches:Object.values(entities).filter(e=>e.observedFrequency>0).length,grammarTargetsOnly:Object.values(entities).filter(e=>!e.observedFrequency&&e.questionTargetEvidence.length).length,extension:Object.values(entities).filter(e=>e.sourceScope==='extension').length,phrases:rows.filter(r=>r[3]==='phrase'||r[1].includes(' ')).length,bands:Object.fromEntries(['Foundation','Core','Challenge'].map(b=>[b,rows.filter(r=>r[6]===b).length])),excludedCandidates:excluded,frequencyPolicy:corpus.scope};
 await write('docs/coverage-audit.json',summary);

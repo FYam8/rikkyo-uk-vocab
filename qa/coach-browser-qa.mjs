@@ -13,6 +13,13 @@ async function isolatedContext(options={}){
 const errors=[];
 async function fresh(){
  const context=await isolatedContext({serviceWorkers:'block'});
+ // Simulate an existing service worker retaining the old unqualified script.
+ // A new bootstrap must request the dataset-qualified runtime instead.
+ await context.route('**/assets/coach-runtime.js*',route=>{
+   const requested=new URL(route.request().url());
+   if(requested.searchParams.get('dataset')==='0.25.0-coverage'&&requested.searchParams.get('release')==='4.1.1')return route.continue();
+   return route.fulfill({contentType:'application/javascript',body:'throw new Error("stale unqualified runtime requested")'});
+ });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url);await page.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  return page;
@@ -31,7 +38,7 @@ async function answer(p,ok=true){
 }
 try{
  const p=await fresh();
- const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.1.0');
+ const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.1.1');
  assert.equal(await p.locator('#modeSelect option').count(),10);
  const curriculum=JSON.parse(await readFile('public/data/manifest.json','utf8'));
  assert.equal(tuple.datasetVersion,curriculum.dataVersion);
@@ -184,7 +191,9 @@ try{
  // Production service worker must cache the dynamically loaded full runtime.
  const offlineContext=await isolatedContext();const offline=await offlineContext.newPage();offline.on('pageerror',e=>errors.push(e.message));
  await offline.goto(url);await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
- await offline.evaluate(()=>navigator.serviceWorker.ready);await offline.reload();
+ await offline.evaluate(()=>navigator.serviceWorker.ready);
+ assert.equal(await offline.evaluate(async()=>!!(await caches.match('/rikkyo-uk-vocab/assets/coach-runtime.js?release=4.1.1&dataset=0.25.0-coverage'))),true);
+ await offline.reload();
  await offline.waitForFunction(()=>navigator.serviceWorker.controller&&window.RikkyoHost&&document.getElementById('audioQuestions'));
  await offlineContext.setOffline(true);await offline.reload();await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  await start(offline);await answer(offline,true);assert.equal(await offline.evaluate(()=>state.stats.totalAnswers),1);
