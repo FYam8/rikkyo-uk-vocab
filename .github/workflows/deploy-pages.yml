@@ -1,4 +1,4 @@
-name: Deploy reselected Core 241 to GitHub Pages
+name: Deploy paper-based Vocabulary Coach to GitHub Pages
 
 on:
   push:
@@ -33,36 +33,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Verify Phase 24 lexical Core data
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          base = Path('public/data')
-          manifest = json.loads((base/'manifest.json').read_text(encoding='utf-8'))
-          registry = json.loads((base/'registry.json').read_text(encoding='utf-8'))
-          rows = []
-          for name in manifest['chunks']:
-              rows.extend(json.loads((base/name).read_text(encoding='utf-8')))
-          assert manifest['appId'] == 'rikkyo-uk-vocab'
-          assert manifest['dataVersion'] == '0.24.0-lexical'
-          assert manifest['generatedFromPhase'] == 24
-          assert len(registry) == 912
-          assert len(set(registry)) == 912
-          assert len(rows) == 241
-          ids = [r[0] for r in rows]
-          assert len(set(ids)) == 241
-          assert all(i in set(registry) for i in ids)
-          assert all(r[1] and r[2] for r in rows)
-          print('Core Runtime Gate: 241/241 PASS')
-          assert len({r[1].lower() for r in rows}) == 241
-          assert {r[6] for r in rows} == {'Foundation', 'Core', 'Challenge'}
-          assert all(r[7] == ['A', 'B'] for r in rows)
-          assert sum(r[6] == 'Foundation' for r in rows) == 30
-          assert sum(r[6] == 'Core' for r in rows) == 151
-          assert sum(r[6] == 'Challenge' for r in rows) == 60
-          print('Stable Registry: 912/912 PASS')
-          PY
+      - name: Verify uncapped paper vocabulary and frequency evidence
+        run: node tools/verify-coverage.mjs
 
       - name: Verify v3 release and Common Engine pin
         run: |
@@ -73,16 +45,16 @@ jobs:
           manifest=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
           release=json.loads(Path('public/release-manifest.json').read_text())
           lock=json.loads(Path('common-engine.lock.json').read_text())
-          assert release['productVersion']=='4.0.0'
+          assert release['productVersion']=='4.1.0'
           assert release['persistenceSchemaVersion']==3
           assert release['exportFormatVersion']==4
           assert release['indexedDbVersion']==3
-          assert release['datasetVersion']=='0.24.0-lexical'
-          assert release['enrichmentVersion']=='2026-09-17-reselected-v4'
+          assert release['datasetVersion']=='0.25.0-coverage'
+          assert release['enrichmentVersion']=='2026-10-17-paper-coverage-v5'
           assert manifest['enrichmentVersion']==release['enrichmentVersion']
           enrichment=json.loads((base/manifest['enrichment']).read_text(encoding='utf-8'))
-          assert enrichment['entityCount']==241
-          assert enrichment['sourceMatchedEntityCount']==132
+          assert enrichment['entityCount']==manifest['coreEntityCount']
+          assert enrichment['sourceMatchedEntityCount']==sum(x['observedFrequency']>0 for x in enrichment['entities'].values())
           assert all('The passage uses' not in (x.get('generatedExample') or {}).get('sentence', '') for x in enrichment['entities'].values())
           assert all('important context' not in (x.get('cloze') or {}).get('sentence', '') for x in enrichment['entities'].values())
           method=next(x for x in enrichment['entities'].values() if x['lemma']=='method')
@@ -150,7 +122,7 @@ jobs:
         with:
           path: dist
 
-      - name: Deploy Core 241
+      - name: Deploy verified vocabulary
         id: deployment
         uses: actions/deploy-pages@v4
 
@@ -172,16 +144,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Wait for the v4.0.0 release on Pages
+      - name: Wait for the verified curriculum on Pages
         run: |
           for i in {1..30}; do
             version=$(curl -fsS "https://fyam8.github.io/rikkyo-uk-vocab/release-manifest.json?sha=${GITHUB_SHA}&attempt=${i}" | python -c 'import json,sys; print(json.load(sys.stdin).get("productVersion", ""))' || true)
-            if [ "$version" = "4.0.0" ]; then
+            if [ "$version" = "4.1.0" ]; then
               exit 0
             fi
             sleep 2
           done
-          echo "GitHub Pages did not publish v4.0.0 in time" >&2
+          echo "GitHub Pages did not publish v4.1.0 in time" >&2
           exit 1
 
       - name: Install production browser runtime

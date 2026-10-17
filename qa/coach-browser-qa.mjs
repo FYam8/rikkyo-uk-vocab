@@ -31,12 +31,25 @@ async function answer(p,ok=true){
 }
 try{
  const p=await fresh();
- const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.0.0');
+ const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.1.0');
  assert.equal(await p.locator('#modeSelect option').count(),10);
- assert.equal(await p.evaluate(()=>VOCAB.length),241);
+ const curriculum=JSON.parse(await readFile('public/data/manifest.json','utf8'));
+ assert.equal(tuple.datasetVersion,curriculum.dataVersion);
+ assert.equal(await p.evaluate(()=>VOCAB.length),curriculum.coreEntityCount);
  assert.equal(await p.evaluate(()=>VOCAB.filter(v=>!EXAM_EXAMPLES[v.id]?.ja).length),0);
  assert.equal(await p.evaluate(()=>VOCAB.filter(v=>/監査エラー|undefined/.test(examExampleHTML(v))).length),0);
  assert.equal(await p.evaluate(()=>VOCAB.filter(v=>EXAM_EXAMPLES[v.id].mode==='generated'&&/過去問例文/.test(examExampleHTML(v))).length),0);
+ // Expanded school curriculum: provenance UI and the unchanged source pools.
+ assert.equal(await p.evaluate(()=>filterPool('recommended','all').filter(v=>v.sourceScope==='extension').length),0);
+ assert.ok(await p.evaluate(()=>filterPool('75','all').some(v=>v.sourceScope==='extension')));
+ assert.ok(await p.locator('#coverageSummary').innerText().then(t=>t.includes(String(curriculum.coreEntityCount))));
+ await p.click('.nav button[data-view="list"]');await p.fill('#searchInput','research');
+ await p.locator('.list-row').filter({hasText:'research'}).first().click();
+ const researchDetail=await p.locator('#sheetContent').innerText();
+ assert.ok(researchDetail.includes('8回 / 3試験'));
+ assert.ok(researchDetail.includes('PDF 3ページ'));
+ await p.locator('#sheetContent button').filter({hasText:'閉じる'}).click();
+ await p.click('.nav button[data-view="learn"]');
  await p.evaluate(()=>{localStorage.setItem('waseshibu_vocab_state','WASEDA-STATE-SENTINEL');localStorage.setItem('waseshibu_vocab_active_session_v1','WASEDA-SESSION-SENTINEL')});
  await start(p);assert.equal(await p.evaluate(()=>currentQuestion.type),'choice');assert.equal(await p.locator('.answer-btn').count(),4);
  const first=await answer(p,true);
@@ -135,6 +148,25 @@ try{
  assert.equal(await draft.inputValue('#typedAnswer'),'par');assert.equal(await draft.evaluate(()=>currentQuestion.questionInstanceId),draftId);
  const activeDownload=draft.waitForEvent('download');await draft.evaluate(()=>exportData());
  const activeBackup=JSON.parse(await readFile(await(await activeDownload).path(),'utf8'));
+ // Previous v4 exports and in-device pending questions survive the expansion.
+ const previousV4=await draft.evaluate(async raw=>{
+   raw=JSON.parse(JSON.stringify(raw));raw.datasetVersion='0.24.0-lexical';raw.productVersion='4.0.0';
+   raw.activeSession.dataVersion='rikkyo-2024-2026-waseda-v7.6';
+   const {checksum,...body}=raw;
+   const stable=x=>x===null||typeof x!=='object'?JSON.stringify(x):Array.isArray(x)?'['+x.map(stable).join(',')+']':'{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+stable(x[k])).join(',')+'}';
+   raw.checksum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(body)))),x=>x.toString(16).padStart(2,'0')).join('');return raw;
+ },activeBackup);
+ const previousRestore=await fresh();await previousRestore.evaluate(raw=>window.RikkyoHost.import(raw),previousV4);
+ await previousRestore.locator('#resumeActiveBtn').waitFor();await previousRestore.click('#resumeActiveBtn');
+ assert.equal(await previousRestore.inputValue('#typedAnswer'),'par');
+ assert.equal(await previousRestore.evaluate(()=>currentQuestion.questionInstanceId),draftId);
+ await previousRestore.evaluate(()=>{
+   persistActiveSession();const key='rikkyo-uk-vocab:coach-v4',b=JSON.parse(localStorage.getItem(key)),k='rikkyo-uk-vocab:waseda-session';
+   const old=JSON.parse(b.records[k]);old.dataVersion='rikkyo-2024-2026-waseda-v7.6';b.records[k]=JSON.stringify(old);localStorage.setItem(key,JSON.stringify(b));
+ });
+ await previousRestore.reload();await previousRestore.locator('#resumeActiveBtn').waitFor();await previousRestore.click('#resumeActiveBtn');
+ assert.equal(await previousRestore.inputValue('#typedAnswer'),'par');
+ assert.equal(await previousRestore.evaluate(()=>currentQuestion.questionInstanceId),draftId);
  const activeRestore=await fresh();await activeRestore.evaluate(raw=>window.RikkyoHost.import(raw),activeBackup);
  await activeRestore.locator('#resumeActiveBtn').waitFor();await activeRestore.click('#resumeActiveBtn');
  assert.equal(await activeRestore.inputValue('#typedAnswer'),'par');assert.equal(await activeRestore.evaluate(()=>currentQuestion.questionInstanceId),draftId);

@@ -1,0 +1,1014 @@
+{
+  "help with": {
+    "id": "rik-p-0893ad10a4",
+    "pos": "phrase"
+  },
+  "in the past": {
+    "id": "rik-p-2200d4e3da",
+    "pos": "phrase"
+  },
+  "for example": {
+    "id": "rik-p-23697ed921",
+    "pos": "phrase"
+  },
+  "local community": {
+    "id": "rik-p-36fd472e0a",
+    "pos": "phrase"
+  },
+  "take place": {
+    "id": "rik-p-3b1e129dc7",
+    "pos": null
+  },
+  "make sure": {
+    "id": "rik-p-45be4b2b9a",
+    "pos": "phrase"
+  },
+  "climate change": {
+    "id": "rik-p-564d709eee",
+    "pos": "phrase"
+  },
+  "industrial revolution": {
+    "id": "rik-p-6684192ea0",
+    "pos": "proper noun"
+  },
+  "find out": {
+    "id": "rik-p-6b270f1c01",
+    "pos": null
+  },
+  "in order to": {
+    "id": "rik-p-7f5b14750a",
+    "pos": "phrase"
+  },
+  "be afraid of": {
+    "id": "rik-p-8bb1f5197d",
+    "pos": "phrase"
+  },
+  "even if": {
+    "id": "rik-p-8e0a656a6f",
+    "pos": "conjunction phrase"
+  },
+  "come from": {
+    "id": "rik-p-9b6e883642",
+    "pos": "phrase"
+  },
+  "up to": {
+    "id": "rik-p-9f00622114",
+    "pos": "phrase"
+  },
+  "even though": {
+    "id": "rik-p-b29415f983",
+    "pos": "conjunction phrase"
+  },
+  "catch a cold": {
+    "id": "rik-p-b504900164",
+    "pos": "phrase"
+  },
+  "at first": {
+    "id": "rik-p-b62c461aee",
+    "pos": "phrase"
+  },
+  "wait and see": {
+    "id": "rik-p-c681b41a14",
+    "pos": null
+  },
+  "be interested in": {
+    "id": "rik-p-e190b10f54",
+    "pos": null
+  },
+  "pass away": {
+    "id": "rik-p-f4518e75f5",
+    "pos": null
+  },
+  "comfortable": {
+    "id": "rik-v-01261e533f",
+    "pos": "adjective"
+  },
+  "feel": {
+    "id": "rik-v-01fb395118",
+    "pos": "verb"
+  },
+  "mistake": {
+    "id": "rik-v-022eb76eb9",
+    "pos": "noun"
+  },
+  "suggest": {
+    "id": "rik-v-032a883f17",
+    "pos": "verb"
+  },
+  "early": {
+    "id": "rik-v-03b1184f0d",
+    "pos": "adjective"
+  },
+  "volunteer": {
+    "id": "rik-v-059675864e",
+    "pos": "noun/verb"
+  },
+  "climate": {
+    "id": "rik-v-067980f22d",
+    "pos": "noun"
+  },
+  "instead": {
+    "id": "rik-v-07c2567e3f",
+    "pos": "adverb"
+  },
+  "surprise": {
+    "id": "rik-v-08d9bf41d7",
+    "pos": "verb/noun"
+  },
+  "long": {
+    "id": "rik-v-0a94988491",
+    "pos": "adverb"
+  },
+  "plastic": {
+    "id": "rik-v-0c369cb334",
+    "pos": "noun/adjective"
+  },
+  "present": {
+    "id": "rik-v-0c5f54b4b9",
+    "pos": "noun"
+  },
+  "sometimes": {
+    "id": "rik-v-0e0f52ddb1",
+    "pos": "adverb"
+  },
+  "invite": {
+    "id": "rik-v-0e9378378d",
+    "pos": "verb"
+  },
+  "difference": {
+    "id": "rik-v-0ecff85b92",
+    "pos": "noun"
+  },
+  "arrive": {
+    "id": "rik-v-0ff638d186",
+    "pos": "verb"
+  },
+  "unfortunately": {
+    "id": "rik-v-11f525390e",
+    "pos": "adverb"
+  },
+  "order": {
+    "id": "rik-v-1265e0a83a",
+    "pos": "verb/noun"
+  },
+  "really": {
+    "id": "rik-v-1303ed8c7f",
+    "pos": "adverb"
+  },
+  "amusement": {
+    "id": "rik-v-1441a756d2",
+    "pos": "noun"
+  },
+  "allow": {
+    "id": "rik-v-14bd614252",
+    "pos": "verb"
+  },
+  "miss": {
+    "id": "rik-v-14ff9596af",
+    "pos": "verb"
+  },
+  "amount": {
+    "id": "rik-v-158315a730",
+    "pos": "noun"
+  },
+  "else": {
+    "id": "rik-v-1685e25a28",
+    "pos": "adverb"
+  },
+  "return": {
+    "id": "rik-v-17f32dcf68",
+    "pos": "verb"
+  },
+  "imagine": {
+    "id": "rik-v-180805357c",
+    "pos": "verb"
+  },
+  "environment": {
+    "id": "rik-v-18c9ee250e",
+    "pos": "noun"
+  },
+  "kindness": {
+    "id": "rik-v-1b09ba73c0",
+    "pos": "noun"
+  },
+  "problem": {
+    "id": "rik-v-1d3d098ad4",
+    "pos": "noun"
+  },
+  "explain": {
+    "id": "rik-v-1daf0db9ec",
+    "pos": "verb"
+  },
+  "pain": {
+    "id": "rik-v-1f7dd7f0cd",
+    "pos": "noun"
+  },
+  "lovely": {
+    "id": "rik-v-204ec8df8d",
+    "pos": "adjective"
+  },
+  "join": {
+    "id": "rik-v-20af7091b4",
+    "pos": "verb"
+  },
+  "memory": {
+    "id": "rik-v-20cb5cd9a1",
+    "pos": "noun"
+  },
+  "toward": {
+    "id": "rik-v-21a3d6a27b",
+    "pos": "preposition"
+  },
+  "reduce": {
+    "id": "rik-v-2397e600cd",
+    "pos": "verb"
+  },
+  "anymore": {
+    "id": "rik-v-24226a75e0",
+    "pos": "adverb"
+  },
+  "material": {
+    "id": "rik-v-25fa932b4a",
+    "pos": "noun"
+  },
+  "fall": {
+    "id": "rik-v-26b4b7d2f8",
+    "pos": "verb"
+  },
+  "interested": {
+    "id": "rik-v-28e8ef4497",
+    "pos": "adjective"
+  },
+  "complete": {
+    "id": "rik-v-294557c415",
+    "pos": "verb/adjective"
+  },
+  "power": {
+    "id": "rik-v-29f64c5c7c",
+    "pos": "noun"
+  },
+  "catch": {
+    "id": "rik-v-2a0e0f4949",
+    "pos": "verb"
+  },
+  "writer": {
+    "id": "rik-v-2b79b74929",
+    "pos": "noun"
+  },
+  "wildlife": {
+    "id": "rik-v-2dedd599e5",
+    "pos": "noun"
+  },
+  "though": {
+    "id": "rik-v-2ec0e6e180",
+    "pos": "conjunction/adverb"
+  },
+  "warm": {
+    "id": "rik-v-2f2f9f3823",
+    "pos": "adjective"
+  },
+  "industrial": {
+    "id": "rik-v-3043890326",
+    "pos": "adjective"
+  },
+  "alive": {
+    "id": "rik-v-30bcf8c65d",
+    "pos": "adjective"
+  },
+  "continue": {
+    "id": "rik-v-31d6f88f46",
+    "pos": "verb"
+  },
+  "front": {
+    "id": "rik-v-3226a0133a",
+    "pos": "adjective"
+  },
+  "surprised": {
+    "id": "rik-v-324dcb9ba8",
+    "pos": "adjective"
+  },
+  "reach": {
+    "id": "rik-v-360e26b470",
+    "pos": "verb"
+  },
+  "building": {
+    "id": "rik-v-37004df94c",
+    "pos": "noun"
+  },
+  "soon": {
+    "id": "rik-v-384aa20460",
+    "pos": "adverb"
+  },
+  "lie": {
+    "id": "rik-v-391a1a1146",
+    "pos": "verb"
+  },
+  "document": {
+    "id": "rik-v-3aacfdae5d",
+    "pos": "noun"
+  },
+  "quickly": {
+    "id": "rik-v-3b201324c4",
+    "pos": "adverb"
+  },
+  "research": {
+    "id": "rik-v-3b9e5f3192",
+    "pos": "noun"
+  },
+  "poor": {
+    "id": "rik-v-3c3e227b74",
+    "pos": "adjective"
+  },
+  "forest": {
+    "id": "rik-v-3c86bed1d4",
+    "pos": "noun"
+  },
+  "sample": {
+    "id": "rik-v-3ca36bb349",
+    "pos": "noun"
+  },
+  "affect": {
+    "id": "rik-v-3ce46edebf",
+    "pos": "verb"
+  },
+  "waste": {
+    "id": "rik-v-3dae188b75",
+    "pos": "noun"
+  },
+  "somewhere": {
+    "id": "rik-v-3dc79962fe",
+    "pos": "adverb"
+  },
+  "believe": {
+    "id": "rik-v-3f32439d10",
+    "pos": "verb"
+  },
+  "influence": {
+    "id": "rik-v-3f33e3106a",
+    "pos": "verb/noun"
+  },
+  "soil": {
+    "id": "rik-v-401eda9187",
+    "pos": "noun"
+  },
+  "begin": {
+    "id": "rik-v-409f1b1b4b",
+    "pos": "verb"
+  },
+  "insect": {
+    "id": "rik-v-469905d2aa",
+    "pos": "noun"
+  },
+  "part": {
+    "id": "rik-v-46f5e7c532",
+    "pos": "noun"
+  },
+  "nature": {
+    "id": "rik-v-48dbadb7d1",
+    "pos": "noun"
+  },
+  "leave": {
+    "id": "rik-v-4cccdd9413",
+    "pos": "verb"
+  },
+  "source": {
+    "id": "rik-v-4e9d903c58",
+    "pos": "noun"
+  },
+  "experience": {
+    "id": "rik-v-4f6e45c0fd",
+    "pos": "noun/verb"
+  },
+  "describe": {
+    "id": "rik-v-4f92ab3170",
+    "pos": "verb"
+  },
+  "doctor": {
+    "id": "rik-v-501377ea82",
+    "pos": "noun"
+  },
+  "release": {
+    "id": "rik-v-51a04e8f8b",
+    "pos": "verb"
+  },
+  "biology": {
+    "id": "rik-v-53ae5a48d6",
+    "pos": "noun"
+  },
+  "teach": {
+    "id": "rik-v-53fa449674",
+    "pos": "verb"
+  },
+  "disappoint": {
+    "id": "rik-v-5416766e02",
+    "pos": "verb"
+  },
+  "wrong": {
+    "id": "rik-v-58ca02f3f7",
+    "pos": "adjective"
+  },
+  "loss": {
+    "id": "rik-v-5913ec829f",
+    "pos": "noun"
+  },
+  "rubbish": {
+    "id": "rik-v-59f8b803e1",
+    "pos": "noun"
+  },
+  "possible": {
+    "id": "rik-v-5c570312d0",
+    "pos": "adjective"
+  },
+  "different": {
+    "id": "rik-v-5d2a931b0c",
+    "pos": "adjective"
+  },
+  "discover": {
+    "id": "rik-v-5e2835816c",
+    "pos": "verb"
+  },
+  "remember": {
+    "id": "rik-v-5ecb40e4e1",
+    "pos": "verb"
+  },
+  "notice": {
+    "id": "rik-v-60fa9f4b12",
+    "pos": "verb/noun"
+  },
+  "presentation": {
+    "id": "rik-v-6389caeff9",
+    "pos": "noun"
+  },
+  "strong": {
+    "id": "rik-v-63a2ba35e1",
+    "pos": "adjective"
+  },
+  "online": {
+    "id": "rik-v-63f640d3f8",
+    "pos": "adverb/adjective"
+  },
+  "rent": {
+    "id": "rik-v-654a8d6e80",
+    "pos": "verb/noun"
+  },
+  "data": {
+    "id": "rik-v-660002986d",
+    "pos": "noun"
+  },
+  "happen": {
+    "id": "rik-v-66ceef36f9",
+    "pos": "verb"
+  },
+  "retention": {
+    "id": "rik-v-66f213f095",
+    "pos": "noun"
+  },
+  "enough": {
+    "id": "rik-v-66fe885b6f",
+    "pos": "determiner"
+  },
+  "dead": {
+    "id": "rik-v-67d57f0bfe",
+    "pos": "adjective"
+  },
+  "correct": {
+    "id": "rik-v-68cb6e40be",
+    "pos": "adjective/verb"
+  },
+  "photosynthesis": {
+    "id": "rik-v-6a1c618348",
+    "pos": "noun"
+  },
+  "confused": {
+    "id": "rik-v-6b306c1065",
+    "pos": "adjective"
+  },
+  "method": {
+    "id": "rik-v-6b534f3bc3",
+    "pos": "noun"
+  },
+  "still": {
+    "id": "rik-v-6d7b2a5699",
+    "pos": "adverb"
+  },
+  "since": {
+    "id": "rik-v-6d8461f39a",
+    "pos": "preposition/conjunction"
+  },
+  "often": {
+    "id": "rik-v-6edd58aaba",
+    "pos": "adverb"
+  },
+  "healthy": {
+    "id": "rik-v-6f11d1d9f6",
+    "pos": "adjective"
+  },
+  "die": {
+    "id": "rik-v-6f5d61cf96",
+    "pos": "verb"
+  },
+  "unusual": {
+    "id": "rik-v-706b9ca99b",
+    "pos": "adjective"
+  },
+  "agree": {
+    "id": "rik-v-7204fad883",
+    "pos": "verb"
+  },
+  "mobile": {
+    "id": "rik-v-7531c011f6",
+    "pos": "adjective"
+  },
+  "forget": {
+    "id": "rik-v-75376d3d36",
+    "pos": "verb"
+  },
+  "note": {
+    "id": "rik-v-755a282eb5",
+    "pos": "noun/verb"
+  },
+  "measure": {
+    "id": "rik-v-7673c6432f",
+    "pos": "verb"
+  },
+  "dream": {
+    "id": "rik-v-774414ee55",
+    "pos": "noun/verb"
+  },
+  "deliver": {
+    "id": "rik-v-7766e0cc1a",
+    "pos": "verb"
+  },
+  "course": {
+    "id": "rik-v-77b0372f08",
+    "pos": "noun"
+  },
+  "cost": {
+    "id": "rik-v-77c12e7777",
+    "pos": "verb/noun"
+  },
+  "project": {
+    "id": "rik-v-780cda553b",
+    "pos": "noun"
+  },
+  "local": {
+    "id": "rik-v-7896949e25",
+    "pos": "adjective"
+  },
+  "collection": {
+    "id": "rik-v-795efa7bc3",
+    "pos": "noun"
+  },
+  "lot": {
+    "id": "rik-v-7d3cc0dd9d",
+    "pos": "noun/adverb"
+  },
+  "listen": {
+    "id": "rik-v-7d517f0019",
+    "pos": "verb"
+  },
+  "creative": {
+    "id": "rik-v-7f1da17c84",
+    "pos": "adjective"
+  },
+  "wild": {
+    "id": "rik-v-7fd9fdad15",
+    "pos": "adjective"
+  },
+  "wonder": {
+    "id": "rik-v-80eb6542c5",
+    "pos": "verb"
+  },
+  "nutrient": {
+    "id": "rik-v-82de1e1d8f",
+    "pos": "noun"
+  },
+  "technology": {
+    "id": "rik-v-833c86d90a",
+    "pos": "noun"
+  },
+  "glad": {
+    "id": "rik-v-863a111fff",
+    "pos": "adjective"
+  },
+  "enjoy": {
+    "id": "rik-v-86a0030c3e",
+    "pos": "verb"
+  },
+  "revolution": {
+    "id": "rik-v-8886c0c819",
+    "pos": "noun"
+  },
+  "everything": {
+    "id": "rik-v-88d896b0e8",
+    "pos": "pronoun"
+  },
+  "prepare": {
+    "id": "rik-v-89f33bc896",
+    "pos": "verb"
+  },
+  "until": {
+    "id": "rik-v-8c032b6a6c",
+    "pos": "conjunction"
+  },
+  "important": {
+    "id": "rik-v-8d3369abca",
+    "pos": "adjective"
+  },
+  "outside": {
+    "id": "rik-v-8db9a86a76",
+    "pos": "adverb/adjective"
+  },
+  "recording": {
+    "id": "rik-v-9229ecd01f",
+    "pos": "noun"
+  },
+  "sick": {
+    "id": "rik-v-94d28422af",
+    "pos": "adjective"
+  },
+  "care": {
+    "id": "rik-v-975bd9fb1c",
+    "pos": "noun/verb"
+  },
+  "understand": {
+    "id": "rik-v-975fd9926e",
+    "pos": "verb"
+  },
+  "trouble": {
+    "id": "rik-v-97bede9fa4",
+    "pos": "noun"
+  },
+  "solve": {
+    "id": "rik-v-98af02d2d0",
+    "pos": "verb"
+  },
+  "record": {
+    "id": "rik-v-991e553731",
+    "pos": "verb/noun"
+  },
+  "bring": {
+    "id": "rik-v-99eae636d9",
+    "pos": "verb"
+  },
+  "seem": {
+    "id": "rik-v-9aca96b37e",
+    "pos": "verb"
+  },
+  "hope": {
+    "id": "rik-v-9d261ac3d8",
+    "pos": "verb/noun"
+  },
+  "study": {
+    "id": "rik-v-9e375de66d",
+    "pos": "verb"
+  },
+  "support": {
+    "id": "rik-v-9ec14fbc9b",
+    "pos": "verb/noun"
+  },
+  "compare": {
+    "id": "rik-v-a10bb57232",
+    "pos": "verb"
+  },
+  "check": {
+    "id": "rik-v-a1b8e9ed56",
+    "pos": "verb"
+  },
+  "afraid": {
+    "id": "rik-v-a35c65c062",
+    "pos": "adjective"
+  },
+  "choose": {
+    "id": "rik-v-a40beca476",
+    "pos": "verb"
+  },
+  "pleased": {
+    "id": "rik-v-a4a35723f1",
+    "pos": "adjective"
+  },
+  "slowly": {
+    "id": "rik-v-a4bdfbcac4",
+    "pos": "adverb"
+  },
+  "protect": {
+    "id": "rik-v-ac945355dd",
+    "pos": "verb"
+  },
+  "result": {
+    "id": "rik-v-aceb10e1d0",
+    "pos": "noun"
+  },
+  "recycle": {
+    "id": "rik-v-ad193d318e",
+    "pos": "verb"
+  },
+  "club": {
+    "id": "rik-v-aec34f21e3",
+    "pos": "noun"
+  },
+  "stranger": {
+    "id": "rik-v-af3eef109a",
+    "pos": "noun"
+  },
+  "growth": {
+    "id": "rik-v-b212727ead",
+    "pos": "noun"
+  },
+  "recyclable": {
+    "id": "rik-v-b3ffffdc2f",
+    "pos": "adjective"
+  },
+  "experiment": {
+    "id": "rik-v-b5c057312c",
+    "pos": "noun"
+  },
+  "angry": {
+    "id": "rik-v-b6acf60694",
+    "pos": "adjective"
+  },
+  "change": {
+    "id": "rik-v-b6bbd59886",
+    "pos": "verb/noun"
+  },
+  "famous": {
+    "id": "rik-v-b768a8c358",
+    "pos": "adjective"
+  },
+  "yet": {
+    "id": "rik-v-b832775afe",
+    "pos": "adverb/conjunction"
+  },
+  "investigate": {
+    "id": "rik-v-b965cb0254",
+    "pos": "verb"
+  },
+  "finally": {
+    "id": "rik-v-b98890953c",
+    "pos": "adverb"
+  },
+  "environmental": {
+    "id": "rik-v-baeed1a87c",
+    "pos": "adjective"
+  },
+  "hold": {
+    "id": "rik-v-bc99234743",
+    "pos": "verb"
+  },
+  "mammal": {
+    "id": "rik-v-bcffb69971",
+    "pos": "noun"
+  },
+  "human": {
+    "id": "rik-v-be93899af6",
+    "pos": "adjective/noun"
+  },
+  "weather": {
+    "id": "rik-v-c0c5905d08",
+    "pos": "noun"
+  },
+  "expensive": {
+    "id": "rik-v-c2402d6eae",
+    "pos": "adjective"
+  },
+  "together": {
+    "id": "rik-v-c445f6f99e",
+    "pos": "adverb"
+  },
+  "borrow": {
+    "id": "rik-v-c519110c0d",
+    "pos": "verb"
+  },
+  "shoulder": {
+    "id": "rik-v-ca098380ec",
+    "pos": "noun"
+  },
+  "condition": {
+    "id": "rik-v-cb8c950b05",
+    "pos": "noun"
+  },
+  "break": {
+    "id": "rik-v-ccbb270109",
+    "pos": "verb/noun"
+  },
+  "equipment": {
+    "id": "rik-v-cd0177a0fd",
+    "pos": "noun"
+  },
+  "ground": {
+    "id": "rik-v-cf73a5841d",
+    "pos": "noun"
+  },
+  "absorb": {
+    "id": "rik-v-d0308dfab4",
+    "pos": "verb"
+  },
+  "future": {
+    "id": "rik-v-d04920ffd5",
+    "pos": "noun"
+  },
+  "voice": {
+    "id": "rik-v-d1a4caec0d",
+    "pos": "noun"
+  },
+  "quietly": {
+    "id": "rik-v-d2c25e8433",
+    "pos": "adverb"
+  },
+  "repair": {
+    "id": "rik-v-d2ebd236ce",
+    "pos": "verb"
+  },
+  "size": {
+    "id": "rik-v-d47d38a014",
+    "pos": "noun"
+  },
+  "hard": {
+    "id": "rik-v-d54dc974fb",
+    "pos": "adverb"
+  },
+  "stay": {
+    "id": "rik-v-d579f48427",
+    "pos": "verb"
+  },
+  "chance": {
+    "id": "rik-v-d5e90b6f6f",
+    "pos": "noun"
+  },
+  "challenge": {
+    "id": "rik-v-d7f043a9bc",
+    "pos": "noun"
+  },
+  "amaze": {
+    "id": "rik-v-d8e66f70fa",
+    "pos": "verb"
+  },
+  "body": {
+    "id": "rik-v-d94392225a",
+    "pos": "noun"
+  },
+  "well": {
+    "id": "rik-v-da15651995",
+    "pos": "adverb"
+  },
+  "seed": {
+    "id": "rik-v-da9eea88b3",
+    "pos": "noun"
+  },
+  "review": {
+    "id": "rik-v-db17d5b385",
+    "pos": "verb/noun"
+  },
+  "follow": {
+    "id": "rik-v-dc19220cf7",
+    "pos": "verb"
+  },
+  "lucky": {
+    "id": "rik-v-dc79bd1ed5",
+    "pos": "adjective"
+  },
+  "difficult": {
+    "id": "rik-v-dce9be8223",
+    "pos": "adjective"
+  },
+  "wear": {
+    "id": "rik-v-df24f5ce06",
+    "pos": "verb"
+  },
+  "spend": {
+    "id": "rik-v-df607e3eb9",
+    "pos": "verb"
+  },
+  "process": {
+    "id": "rik-v-e1d3724beb",
+    "pos": "noun/verb"
+  },
+  "month": {
+    "id": "rik-v-e1e3308926",
+    "pos": "noun"
+  },
+  "suddenly": {
+    "id": "rik-v-e7295df42b",
+    "pos": "adverb"
+  },
+  "close": {
+    "id": "rik-v-e8f4404a9e",
+    "pos": "verb/adjective"
+  },
+  "recycling": {
+    "id": "rik-v-e97c996cd5",
+    "pos": "noun"
+  },
+  "able": {
+    "id": "rik-v-e997efc211",
+    "pos": "adjective"
+  },
+  "free": {
+    "id": "rik-v-eae955a750",
+    "pos": "adjective"
+  },
+  "energy": {
+    "id": "rik-v-eb0c79fc29",
+    "pos": "noun"
+  },
+  "design": {
+    "id": "rik-v-f35d11cb99",
+    "pos": "verb/noun"
+  },
+  "practical": {
+    "id": "rik-v-f443138160",
+    "pos": "adjective"
+  },
+  "carry": {
+    "id": "rik-v-f5b27d25d2",
+    "pos": "verb"
+  },
+  "spicy": {
+    "id": "rik-v-f5c237d157",
+    "pos": "adjective"
+  },
+  "organism": {
+    "id": "rik-v-f6b071dabf",
+    "pos": "noun"
+  },
+  "tourist": {
+    "id": "rik-v-f73ffa26fb",
+    "pos": "noun"
+  },
+  "hunter": {
+    "id": "rik-v-f95fdfe95e",
+    "pos": "noun"
+  },
+  "photograph": {
+    "id": "rik-v-f9de9cded7",
+    "pos": "noun"
+  },
+  "electricity": {
+    "id": "rik-v-fb0c8cb406",
+    "pos": "noun"
+  },
+  "interview": {
+    "id": "rik-v-fc1dd5ab8d",
+    "pos": "noun/verb"
+  },
+  "usually": {
+    "id": "rik-v-fc55a5e253",
+    "pos": "adverb"
+  },
+  "inside": {
+    "id": "rik-v-fcd6be1d48",
+    "pos": "preposition/adverb/noun"
+  },
+  "prefer": {
+    "id": "rik-v-fe600ac703",
+    "pos": "verb"
+  },
+  "get rid of": {
+    "id": "rik-p-13dbef0688",
+    "pos": null
+  },
+  "come up with": {
+    "id": "rik-p-3d9f0e6e2e",
+    "pos": null
+  },
+  "follow instructions": {
+    "id": "rik-p-513dc9a87a",
+    "pos": null
+  },
+  "look after": {
+    "id": "rik-p-866197e979",
+    "pos": null
+  },
+  "get stuck": {
+    "id": "rik-p-8d868977a3",
+    "pos": null
+  },
+  "be able to": {
+    "id": "rik-p-a6515c1cdc",
+    "pos": null
+  },
+  "in full bloom": {
+    "id": "rik-p-b39768d881",
+    "pos": null
+  },
+  "day in and day out": {
+    "id": "rik-p-d52d874431",
+    "pos": null
+  },
+  "give up": {
+    "id": "rik-p-ed3acfc479",
+    "pos": null
+  },
+  "picture": {
+    "id": "rik-v-02c9a1d571",
+    "pos": "noun"
+  },
+  "world": {
+    "id": "rik-v-045825760f",
+    "pos": "noun"
+  },
+  "morning": {
+    "id": "rik-v-0846d98bcc",
+    "pos": "noun"
+  }
+}

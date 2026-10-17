@@ -1,0 +1,33 @@
+{
+  "total": 426,
+  "added": 185,
+  "registryCount": 1058,
+  "printedMatches": 309,
+  "grammarTargetsOnly": 5,
+  "extension": 112,
+  "phrases": 43,
+  "bands": {
+    "Foundation": 41,
+    "Core": 316,
+    "Challenge": 69
+  },
+  "excludedCandidates": [
+    {
+      "lemma": "joyful",
+      "reason": "No printed occurrence or separately reviewed grammar target in this corpus"
+    },
+    {
+      "lemma": "slippery",
+      "reason": "No printed occurrence or separately reviewed grammar target in this corpus"
+    },
+    {
+      "lemma": "each other",
+      "reason": "No printed occurrence or separately reviewed grammar target in this corpus"
+    },
+    {
+      "lemma": "be made of",
+      "reason": "No printed occurrence or separately reviewed grammar target in this corpus"
+    }
+  ],
+  "frequencyPolicy": "Printed English content and question/choice text; recurring instructions, solved examples, Japanese glossaries and unavailable audio excluded. OCR transcription with reviewed spelling repairs; counts describe this printed corpus, not unseen audio or all English vocabulary."
+}

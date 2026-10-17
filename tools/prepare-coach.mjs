@@ -7,6 +7,7 @@ const lock = JSON.parse(await read('waseda-app.lock.json'));
 const enrichment = JSON.parse(await read('public/data/enrichment.json'));
 const translations = JSON.parse(await read('src/coach/source-translations.json'));
 const rows = Object.values(enrichment.entities);
+const registry=JSON.parse(await read('public/data/registry.json'));
 const manifest=JSON.parse(await read('public/data/manifest.json'));
 const packed=(await Promise.all(manifest.chunks.map(name=>read('public/data/'+name).then(JSON.parse)))).flat();
 const posById=new Map(packed.map(row=>[row[0],row[3]]));
@@ -14,14 +15,15 @@ const vocab = rows.map(e => ({
   id:e.stableId, word:e.lemma, meaning:e.meaningJa, representativeMeaning:e.meaningJa,
   pos:({noun:'n.',verb:'v.',adjective:'adj.',adverb:'adv.'}[posById.get(e.stableId)]||posById.get(e.stableId)||'phrase'), priority:e.priority,
   level:{Foundation:60,Core:70,Challenge:75}[e.targetBand],
-  studyLayer:e.targetBand==='Challenge'?'challenge':'core',
+  studyLayer:e.studyLayer, sourceScope:e.sourceScope, paperCount:e.paperCount,
+  observedYears:e.observedYears, evidence:e.evidence, questionTargetEvidence:e.questionTargetEvidence, glossedInSource:e.glossedInSource,
   frequency:e.observedFrequency, surfaceFrequency:e.observedFrequency,
-  yearCount:e.years.length, years:e.years, surfaceYears:e.years,
+  yearCount:e.years.length, years:e.years, surfaceYears:e.observedYears,
   categories:e.categories.map(c=>c==='reading-language'?'reading':c),
-  derivatives:[],relatedPhrases:[],directYears:[],directOrderYears:[],directAnswerYears:[],
+  derivatives:[],relatedPhrases:[],directYears:[...new Set(e.questionTargetEvidence.map(t=>t.year))],directOrderYears:[],directAnswerYears:[],
   derivedForms:[],compoundForms:[],forms:[e.lemma],glossed:false,
   sourceType:e.lemma.includes(' ')?'phrase':'word',auditStatus:'rikkyo-source-reviewed',
-  note:e.sourceExample?'':'立教の出題傾向に合わせた練習例文です。',
+  note:(e.sourceScope==='extension'?'発展語：6冊の集計対象箇所で出現未確認。':e.questionTargetEvidence.length&&!e.observedFrequency?'文法の出題対象。完成形は冊子に未掲載。':'過去問の本文・設問で出現。')+(e.sourceExample?'':' 練習用に作成した例文です。'),
 }));
 const examples={}, cloze={};
 for(const e of rows){
@@ -47,9 +49,9 @@ for(const e of rows){
 }
 const count=l=>vocab.filter(v=>v.studyLayer===l).length;
 const meta={
-  dataVersion:'rikkyo-2024-2026-waseda-v7.6',years:[2024,2025,2026],
+  dataVersion:manifest.dataVersion,years:[2024,2025,2026],
   method:'FY24–FY26 英語A/Bを統合。立教の教材を早稲田と同じ出題・記憶モデルで学習。',
-  auditStatus:'原本照合例文・全文和訳付き',rawCandidateEntries:912,
+  auditStatus:'6冊の本文・設問を集計・和訳付き',rawCandidateEntries:registry.length,
   registeredWords:vocab.filter(v=>v.sourceType==='word').length,registeredPhrases:vocab.filter(v=>v.sourceType==='phrase').length,
   learnableTotal:vocab.length,registeredTotal:vocab.length,directVocabCount:'未集計',glossedReferenceCount:0,
   verifiedEvidenceEntries:rows.filter(e=>e.evidence.length).length,
@@ -57,7 +59,7 @@ const meta={
   frequencySourceFiles:[2024,2025,2026].flatMap(y=>['A','B'].map(s=>`FY${String(y).slice(-2)} 英語${s} 問題冊子`)),
   auxiliaryAnswerFiles:[],missing:['公式解答・リスニング音源は本教材に含めていません。'],
 };
-const top=[...vocab].sort((a,b)=>b.frequency-a.frequency).slice(0,100).map((v,i)=>({...v,rank:i+1,reason:'確認年度と出現回数'}));
+const top=vocab.filter(v=>v.frequency>0).sort((a,b)=>b.observedYears.length-a.observedYears.length||b.paperCount-a.paperCount||b.frequency-a.frequency||a.word.localeCompare(b.word)).slice(0,100).map((v,i)=>({...v,rank:i+1,reason:`${v.paperCount}試験・${v.observedYears.length}年度・${v.frequency}回`}));
 const data=`const VOCAB=${JSON.stringify(vocab)};\nconst CLOZE=${JSON.stringify(cloze)};\nconst META=${JSON.stringify(meta)};\nconst TOP100=${JSON.stringify(top)};\nconst EXAM_EXAMPLES=${JSON.stringify(examples)};\n`;
 
 // Only school identity, version identifiers, and storage bindings are patched.
