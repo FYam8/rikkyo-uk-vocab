@@ -1,3 +1,6 @@
+import curriculum from '../../public/data/manifest.json';
+import release from '../../public/release-manifest.json';
+import { WORD_TIERS } from '../progress/tiers.js';
 import { openStudyDb } from '../storage';
 import { ensureGeneration, exportEnvelope, verifyEnvelope, stableJson, listBackups, loadBackup } from '../rich/store';
 
@@ -37,6 +40,15 @@ async function boot(){
     }
     bundle={format:FORMAT,revision:0,records:{},createdAt:new Date().toISOString()};
   }
+  // All previous v4 entries retain their stable IDs. Carry a valid pending
+  // question across this data-only expansion instead of letting upstream init
+  // discard it merely because the dataset label changed.
+  const pending=parse(bundle.records[SESSION]);
+  if(pending&&['rikkyo-2024-2026-waseda-v7.6','0.24.0-lexical'].includes(pending.dataVersion)){
+    const ids=new Set(Object.keys(WORD_TIERS));
+    const referenced=[...(pending.baseQueueIds||[]),...(pending.candidatePoolIds||[]),...(pending.generatedBaseIds||[]),...(pending.currentQuestion?[pending.currentQuestion.wordId]:[])];
+    if(referenced.every(id=>ids.has(id)))commit({...bundle,records:{...bundle.records,[SESSION]:JSON.stringify({...pending,dataVersion:curriculum.dataVersion})}});
+  }
   function commit(next){
     const disk=parse(localStorage.getItem(KEY));
     if(disk && disk.revision!==bundle.revision){location.reload();throw new Error('別タブの学習履歴を読み直します。')}
@@ -47,8 +59,8 @@ async function boot(){
     if(!archives.some(x=>x.checksum===envelope.checksum)){const next=[...archives,envelope];await putMeta('coach-v4-archives',next);archives=next;}
   }
   async function payload(){
-    const body={appId:'rikkyo-uk-vocab',exportFormat:FORMAT,exportFormatVersion:4,productVersion:'4.0.0',
-      engineVersion:'waseda-vocabulary/7.6',engineCommit:'6f4788386a1935d6e2703c694257c1f327b0f831',datasetVersion:'0.24.0-lexical',
+    const body={appId:'rikkyo-uk-vocab',exportFormat:FORMAT,exportFormatVersion:4,productVersion:release.productVersion,
+      engineVersion:'waseda-vocabulary/7.6',engineCommit:'6f4788386a1935d6e2703c694257c1f327b0f831',datasetVersion:curriculum.dataVersion,
       exportedAt:new Date().toISOString(),state:parse(bundle.records[STATE]),activeSession:parse(bundle.records[SESSION]),legacyArchives:clone(archives)};
     return {...body,checksum:await digest(body)};
   }
@@ -70,7 +82,7 @@ async function boot(){
         const old=await verifyEnvelope(raw);await archive(raw);
         ({state:incoming,session:active}=window.RikkyoConvertLegacy(old));
       }else{
-        if(raw.appId!=='rikkyo-uk-vocab'||raw.exportFormat!==FORMAT||raw.engineVersion!=='waseda-vocabulary/7.6'||raw.datasetVersion!=='0.24.0-lexical')throw new Error('別アプリまたは未対応のバックアップです');
+        if(raw.appId!=='rikkyo-uk-vocab'||raw.exportFormat!==FORMAT||raw.engineVersion!=='waseda-vocabulary/7.6'||!['0.24.0-lexical',curriculum.dataVersion].includes(raw.datasetVersion))throw new Error('別アプリまたは未対応のバックアップです');
         const {checksum,...body}=raw;if(await digest(body)!==checksum)throw new Error('バックアップの検証に失敗しました');
         incoming=raw.state;active=raw.activeSession;
         if(!incoming||incoming.schemaVersion!==7||!incoming.words)throw new Error('学習履歴の形式が不正です');

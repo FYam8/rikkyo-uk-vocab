@@ -1,7 +1,7 @@
 /* School data labels, device capabilities and the legacy persistence boundary.
    No scoring, mastery, forgetting-curve, distractor or session algorithms here. */
 MODE_OPTIONS.splice(0,MODE_OPTIONS.length,
-  ['recommended','おすすめ学習'],['exam','実戦トレーニング'],['60','基礎重点'],['70','Core重点'],['75','Challenge重点'],
+  ['recommended','おすすめ学習'],['exam','実戦トレーニング'],['60','基礎重点'],['70','Core重点'],['75','発展・Challenge重点'],
   ['unlearned','未学習'],['weak','苦手'],['review','復習期限'],['frequent','頻出語'],['random','ランダム']);
 const RIKKYO_MODE_MAP={foundation:'60',core:'70',challenge:'75'};
 const RIKKYO_KIND_MAP={meaningChoice:'choice',reverseChoice:'reverseChoice',input:'reverse',audioChoice:'audioChoice',audioInput:'audio',clozeChoice:'cloze',clozeInput:'cloze'};
@@ -96,7 +96,8 @@ examExampleHTML=function(v){
 const rikkyoAnalysisRenderer=renderAnalysis;
 renderAnalysis=function(){
   rikkyoAnalysisRenderer();
-  const note=document.getElementById('analysisCandidateNote');if(note)note.textContent='912は既存の固定ID台帳の登録数です。現在のクイズ対象は241語です。';
+  const note=document.getElementById('analysisCandidateNote');if(note)note.textContent=`固定ID台帳は${META.rawCandidateEntries}件、学習対象は${VOCAB.length}項目です。過去問の出題語と発展語を区別して収録しています。`;
+  const help=$('evidenceCountHelp');if(help)help.textContent='回数は6冊の本文・設問・選択肢の転記を集計。活用形をまとめ、共通指示・解答例・日本語注釈欄・未入手の音声は除外しています。語句整序の完成形を推定した項目は回数に加えません。';
   const description=$('analysisCounts').querySelector('.small.muted');if(description)description.textContent='通常学習とChallengeの教材区分は立教データに基づきます。出題優先度・再確認・習熟度・忘却曲線は早稲田と同じ処理です。';
 };
 
@@ -122,7 +123,7 @@ init=function(){
   rikkyoInit();
   const settings=$('view-settings');
   const card=document.createElement('div');card.className='card';
-  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.0.0 · 早稲田 Vocabulary Coach v7.6</p>';
+  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.1.0 · 早稲田 Vocabulary Coach v7.6</p>';
   settings.append(card);$('audioQuestions').value=state.settings.audioQuestions||'auto';
   $('audioQuestions').onchange=e=>{state.settings.audioQuestions=e.target.value;markSettingsUpdated();saveState()};
   async function showBackups(){
@@ -134,4 +135,30 @@ init=function(){
   }
   $('localBackup').onclick=()=>window.RikkyoHost.saveBackup().then(showBackups).then(()=>showToast('バックアップしました')).catch(e=>showToast(e.message,{kind:'error'}));
   showBackups().catch(console.error);
+};
+
+// School-owned provenance presentation; no change to shared learning policy.
+LAYER_LABEL.challenge='発展・Challenge';
+const rikkyoBadges=badgeHTML;
+badgeHTML=function(v){
+ const source=v.sourceScope==='extension'?'発展語':v.frequency?'過去問出現語':'文法の出題対象';
+ return rikkyoBadges(v)+`<span class="badge">${esc(source)}</span>`;
+};
+v75CompactEvidence=function(v){
+ if(v.sourceScope==='extension')return '発展語<br>冊子内の出現未確認';
+ if(!v.frequency)return '文法の出題対象<br>完成形の掲載 0回';
+ return `${v.frequency}回 / ${v.paperCount}試験<br>${v.observedYears.length}年度（${v.observedYears.join(', ')}）`;
+};
+v75EvidenceDetail=function(v){
+ const rows=(v.evidence||[]).map(e=>`<li>FY${String(e.year).slice(-2)} ${esc(e.schedule)} · PDF ${e.page}ページ · ${e.count}回（${esc(e.forms.join(' / '))}）</li>`).join('');
+ const targets=(v.questionTargetEvidence||[]).map(e=>`<li>FY${String(e.year).slice(-2)} ${esc(e.schedule)} · PDF ${e.page}ページ · 文法の出題対象（完成形の登場回数には含めません）</li>`).join('');
+ return `<div class="small">${v75CompactEvidence(v)}${v.glossedInSource?'<p>原本に日本語注釈がある語です。同じ物語内での反復だけでは最優先にしません。</p>':''}${rows||targets?`<ul>${rows}${targets}</ul>`:'<p>関連する発展学習用の語です。今回の6冊の集計対象箇所では出現を確認していません。</p>'}<p>回数は活用形をまとめた冊子内の集計です。共通指示・解答例・日本語注釈欄・未入手の音声は含みません。</p></div>`;
+};
+const rikkyoCoverageInit=init;
+init=function(){
+ rikkyoCoverageInit();
+ const past=VOCAB.filter(v=>v.sourceScope==='past-paper').length,extension=VOCAB.length-past;
+ const intro=document.createElement('p');intro.className='small muted';intro.id='coverageSummary';
+ intro.textContent=`${VOCAB.length}項目：過去問の出題語${past}・発展語${extension}。おすすめ学習は出題語を優先し、発展語は「発展・Challenge重点」で学習できます。`;
+ $('view-learn').prepend(intro);
 };

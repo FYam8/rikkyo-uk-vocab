@@ -1,7 +1,8 @@
+import curriculum from '../public/data/manifest.json';
 export const APP_ID = "rikkyo-uk-vocab" as const;
 export const PRODUCT_VERSION = "3.7.0" as const;
 export const ENGINE_VERSION = "common-vocab-engine/1.0.0" as const;
-export const DATASET_VERSION = "0.24.0-lexical" as const;
+export const DATASET_VERSION = curriculum.dataVersion;
 export const PERSISTENCE_SCHEMA_VERSION = 3 as const;
 export const EXPORT_FORMAT_VERSION = 3 as const;
 export const INDEXED_DB_VERSION = 3 as const;
@@ -10,9 +11,9 @@ export const BACKUP_DB_NAME = "rikkyo-uk-vocab-backup-v1" as const;
 export const LOCAL_STORAGE_PREFIX = "rikkyo-uk-vocab:" as const;
 export const BROADCAST_CHANNEL = "rikkyo-uk-vocab:coordination:v1" as const;
 export const EXPORT_FORMAT = "rikkyo-uk-vocab-export/v3" as const;
-export const CORE_ENTITY_COUNT = 241 as const;
-export const REGISTRY_ENTITY_COUNT = 912 as const;
-export const ENRICHMENT_VERSION = "2026-09-17-reselected-v4" as const;
+export const CORE_ENTITY_COUNT = curriculum.coreEntityCount;
+export const REGISTRY_ENTITY_COUNT = curriculum.registryEntityCount;
+export const ENRICHMENT_VERSION = curriculum.enrichmentVersion;
 
 export const SCHEDULER_CONFIG = Object.freeze({
   algorithm: "FSRS-6",
@@ -54,3 +55,5 @@ export function exportRejectionReason(appId: unknown): string | null {
   }
   return "このexportは別アプリの形式です。";
 }
+
+export const DATASET_PHASE = curriculum.generatedFromPhase;
