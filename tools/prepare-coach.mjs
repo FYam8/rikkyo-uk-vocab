@@ -72,6 +72,7 @@ for(const name of lock.runtimeOrder){
   if(createHash('sha256').update(source).digest('hex')!==lock.files[name])throw new Error('Upstream drift: '+name);
   code+=`\n/* UPSTREAM BEGIN ${name} */\n${adaptSource(source)}\n/* UPSTREAM END ${name} */\n`;
 }
+code+='\n'+await read('src/common-engine/delayed-retention.js');
 code+='\n'+await read('src/coach/school-adapter.js')+'\n'+await read('vendor/waseda/40-runtime-bootstrap-tail.js');
 let shell=await read('vendor/waseda/00-shell-prefix.html');
 shell=shell.slice(0,shell.lastIndexOf('<script>'));

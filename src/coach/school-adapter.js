@@ -145,7 +145,7 @@ init=function(){
   rikkyoInit();
   const settings=$('view-settings');
   const card=document.createElement('div');card.className='card';
-  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.2.0 · 早稲田 Vocabulary Coach v7.6</p>';
+  card.innerHTML='<h2>端末とバックアップ</h2><div class="field"><label for="audioQuestions">音声問題</label><select id="audioQuestions"><option value="auto">自動</option><option value="off">使用しない</option></select></div><button class="secondary full" id="localBackup" style="margin-top:14px">端末内バックアップ</button><div id="savedBackups"></div><p class="tiny muted">立教版 4.3.0 · Vocabulary Coach · 翌日以降の定着を重視</p>';
   settings.append(card);$('audioQuestions').value=state.settings.audioQuestions||'auto';
   $('audioQuestions').onchange=e=>{state.settings.audioQuestions=e.target.value;markSettingsUpdated();saveState()};
   async function showBackups(){
@@ -182,7 +182,7 @@ init=function(){
  rikkyoCoverageInit();
  const past=VOCAB.filter(v=>v.ordinaryEligible).length,extension=VOCAB.length-past;
  const intro=document.createElement('p');intro.className='small muted';intro.id='coverageSummary';
- intro.textContent=`通常学習は、冊子で出現を確認した${past}項目が対象です。未出現・完成形未掲載の${extension}項目は「追加の語彙（任意）」を選んだ場合だけ出題します。登録は計${VOCAB.length}項目です。`;
+ intro.textContent=`通常学習は、冊子で出現を確認した${past}項目が対象です。未出現・完成形未掲載の${extension}項目は「追加の語彙（任意）」を選んだ場合だけ出題します。登録は計${VOCAB.length}項目です。短時間の正解は再確認として記録し、24時間以上空けて正解した語の習熟度を重く評価します。`;
  $('view-learn').prepend(intro);
 };
 
