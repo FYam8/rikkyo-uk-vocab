@@ -36,7 +36,7 @@ describe('paper coverage and occurrence policy',()=>{
   expect(priorityFor({frequency:2,paperCount:2,yearCount:2})).toBe('S');
   expect(priorityFor({frequency:20,paperCount:1,yearCount:1,glossOnly:true})).toBe('B');
   expect(priorityFor({frequency:3,paperCount:1,yearCount:1})).toBe('A');
-  expect(es.filter(e=>e.sourceScope==='extension').every(e=>e.priority==='C'&&e.studyLayer==='challenge')).toBe(true);
+  expect(es.filter(e=>e.sourceScope==='extension').every(e=>e.priority==='C'&&e.studyLayer==='reference')).toBe(true);
  });
  it('excludes repeated instructions and the solved farewell example',()=>{
   const text=JSON.stringify(corpus.papers);

@@ -17,7 +17,7 @@ async function fresh(){
  // A new bootstrap must request the dataset-qualified runtime instead.
  await context.route('**/assets/coach-runtime.js*',route=>{
    const requested=new URL(route.request().url());
-   if(requested.searchParams.get('dataset')==='0.25.0-coverage'&&requested.searchParams.get('release')==='4.1.1')return route.continue();
+   if(requested.searchParams.get('dataset')==='0.26.0-originals'&&requested.searchParams.get('release')==='4.2.0')return route.continue();
    return route.fulfill({contentType:'application/javascript',body:'throw new Error("stale unqualified runtime requested")'});
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -38,8 +38,8 @@ async function answer(p,ok=true){
 }
 try{
  const p=await fresh();
- const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.1.1');
- assert.equal(await p.locator('#modeSelect option').count(),10);
+ const tuple=await p.evaluate(async()=> (await fetch('./release-manifest.json')).json());assert.equal(tuple.productVersion,'4.2.0');
+ assert.equal(await p.locator('#modeSelect option').count(),11);
  const curriculum=JSON.parse(await readFile('public/data/manifest.json','utf8'));
  assert.equal(tuple.datasetVersion,curriculum.dataVersion);
  assert.equal(await p.evaluate(()=>VOCAB.length),curriculum.coreEntityCount);
@@ -48,7 +48,24 @@ try{
  assert.equal(await p.evaluate(()=>VOCAB.filter(v=>EXAM_EXAMPLES[v.id].mode==='generated'&&/過去問例文/.test(examExampleHTML(v))).length),0);
  // Expanded school curriculum: provenance UI and the unchanged source pools.
  assert.equal(await p.evaluate(()=>filterPool('recommended','all').filter(v=>v.sourceScope==='extension').length),0);
- assert.ok(await p.evaluate(()=>filterPool('75','all').some(v=>v.sourceScope==='extension')));
+ assert.equal(await p.evaluate(()=>filterPool('75','all').some(v=>!v.ordinaryEligible)),false);
+ const eligibility=await p.evaluate(()=>{
+   const ordinary=['recommended','exam','60','70','75','unlearned','weak','review','frequent','random'];
+   let bad=[];
+   for(const mode of ordinary)for(const year of ['all','2024','2025','2026'])for(const size of [0,10,50]){
+     const plan=buildSessionPlan(mode,year,size);
+     for(const id of [...plan.baseQueueIds,...(plan.candidatePoolIds||[])])if(!VOCAB_BY_ID.get(id)?.ordinaryEligible)bad.push({mode,year,id});
+   }
+   for(const v of VOCAB.filter(v=>v.ordinaryEligible))for(const distractor of getDistractors(v))if(!distractor.ordinaryEligible)bad.push({distractor:distractor.id});
+   return {bad,optional:filterPool('optional','all').length,eligible:VOCAB.filter(v=>v.ordinaryEligible).length,unquoted:VOCAB.filter(v=>v.ordinaryEligible&&EXAM_EXAMPLES[v.id].mode!=='exact').map(v=>v.word)};
+ });assert.deepEqual(eligibility,{bad:[],optional:117,eligible:309,unquoted:[]});
+ // The rendered source text, including incorrect grammar/word order, must be literal.
+ const excerpts=await p.evaluate(()=>VOCAB.filter(v=>EXAM_EXAMPLES[v.id].mode==='exact').map(v=>{
+   const d=document.createElement('div');d.innerHTML=examExampleHTML(v);const ex=EXAM_EXAMPLES[v.id];
+   return {word:v.word,same:d.querySelector('.exam-example-sentence').textContent===ex.sentence,head:d.querySelector('.exam-example-head').textContent,note:d.querySelector('.exam-example-note')?.textContent||'',kind:ex.kind};
+ }));
+ assert.equal(excerpts.length,314);assert.ok(excerpts.every(x=>x.same&&x.head.includes('PDF p.')));
+ assert.ok(excerpts.filter(x=>x.kind==='error-correction').every(x=>x.note.includes('誤りを含む')));
  assert.ok(await p.locator('#coverageSummary').innerText().then(t=>t.includes(String(curriculum.coreEntityCount))));
  await p.click('.nav button[data-view="list"]');await p.fill('#searchInput','research');
  await p.locator('.list-row').filter({hasText:'research'}).first().click();
@@ -60,9 +77,11 @@ try{
  await p.evaluate(()=>{localStorage.setItem('waseshibu_vocab_state','WASEDA-STATE-SENTINEL');localStorage.setItem('waseshibu_vocab_active_session_v1','WASEDA-SESSION-SENTINEL')});
  await start(p);assert.equal(await p.evaluate(()=>currentQuestion.type),'choice');assert.equal(await p.locator('.answer-btn').count(),4);
  const first=await answer(p,true);
+ if(process.env.QA_SCREENSHOT_DIR){await mkdir(process.env.QA_SCREENSHOT_DIR,{recursive:true});await p.screenshot({path:process.env.QA_SCREENSHOT_DIR+'/coach-feedback.png',fullPage:true})}
  const before=await p.evaluate(()=>({p:state.words[currentQuestion.v.id],qid:currentQuestion.questionInstanceId,total:state.stats.totalAnswers}));
  assert.equal(before.p.correct,1);assert.ok(before.p.memoryModel.stabilityDays>0);assert.ok(Date.parse(before.p.nextReview)>Date.now());
- const feedback=await p.locator('#feedback').innerText();assert.ok(feedback.includes(await p.evaluate(()=>EXAM_EXAMPLES[currentQuestion.v.id].ja)));
+ assert.ok(await p.evaluate(()=>currentQuestion.v.ordinaryEligible&&currentQuestion.choiceIds.every(id=>VOCAB_BY_ID.get(id)?.ordinaryEligible)));
+ const feedback=await p.locator('#feedback').innerText();assert.ok(feedback.includes('過去問原文'));assert.ok(feedback.includes(await p.evaluate(()=>EXAM_EXAMPLES[currentQuestion.v.id].ja)));
  await p.reload();await p.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  await p.locator('#resumeActiveBtn').waitFor();await p.click('#resumeActiveBtn');
  assert.equal(await p.evaluate(()=>currentQuestion.questionInstanceId),before.qid);
@@ -110,10 +129,34 @@ try{
  assert.deepEqual(await restored.evaluate(()=>state.words),exported.state.words);
  assert.equal(await restored.evaluate(async raw=>{raw.state.stats.totalAnswers++;try{await window.RikkyoHost.import(raw);return false}catch{return true}},exported),true);
  await restored.evaluate(()=>window.RikkyoHost.saveBackup());assert.equal(await restored.evaluate(async()=> (await window.RikkyoHost.backups()).length),1);
+ // Optional entries appear only after explicit mode selection; they resume and restore.
+ const optional=await fresh();await optional.selectOption('#learnYearSelect','2024');await start(optional,'optional');
+ assert.equal(await optional.isDisabled('#learnYearSelect'),true);
+ assert.equal(await optional.evaluate(()=>currentQuestion.v.ordinaryEligible),false);
+ const optionalId=await optional.evaluate(()=>currentQuestion.questionInstanceId);
+ await answer(optional,true);
+ await optional.reload();await optional.locator('#resumeActiveBtn').waitFor();await optional.click('#resumeActiveBtn');
+ assert.equal(await optional.evaluate(()=>currentQuestion.questionInstanceId),optionalId);
+ assert.equal(await optional.evaluate(()=>state.stats.totalAnswers),1);
+ const optionalDownload=optional.waitForEvent('download');await optional.evaluate(()=>exportData());
+ const optionalBackup=JSON.parse(await readFile(await(await optionalDownload).path(),'utf8'));
+ const optionalRestore=await fresh();await optionalRestore.evaluate(raw=>window.RikkyoHost.import(raw),optionalBackup);
+ await optionalRestore.locator('#resumeActiveBtn').waitFor();await optionalRestore.click('#resumeActiveBtn');
+ assert.equal(await optionalRestore.evaluate(()=>currentQuestion.questionInstanceId),optionalId);
+ assert.equal(await optionalRestore.evaluate(()=>currentQuestion.v.ordinaryEligible),false);
+ // An old ordinary session containing an optional target/choice cannot resume.
+ assert.equal(await optionalRestore.evaluate(()=>{const s=JSON.parse(window.RikkyoHost.get(V75_ACTIVE_SESSION_KEY));return validateActiveSession({...s,mode:'recommended'})}),false);
+ await optionalRestore.evaluate(()=>endSession(true));await start(optionalRestore,'recommended');
+ assert.equal(await optionalRestore.evaluate(()=>currentQuestion.v.ordinaryEligible),true);
+ assert.equal(await optionalRestore.isDisabled('#learnYearSelect'),false);
+ const ordinaryImport=await fresh();
+ await ordinaryImport.evaluate(raw=>window.RikkyoMergeBackup(raw.state,{...raw.activeSession,mode:'recommended'}),optionalBackup);
+ assert.equal(await ordinaryImport.evaluate(()=>state.stats.totalAnswers),1);
+ assert.equal(await ordinaryImport.evaluate(()=>loadActiveSession()),null);
  // Migrate a real v3 database shape, retaining untouched legacy records and IDs.
  const legacy=await fresh();const fixture=JSON.parse(await readFile('tests/fixtures/v3-golden-export.json','utf8'));
  const seed=await legacy.evaluate(async fixture=>{
-   const id=VOCAB[0].id;
+   const id=VOCAB.find(v=>v.ordinaryEligible).id;
    const source=JSON.parse(JSON.stringify(fixture).replaceAll('rik-v-golden',id));
    source.memory.push({...source.memory[0],key:'skill:retired-qa:meaningRecognition',stableId:'retired-qa',correct:5});
    const r=indexedDB.open('rikkyo-uk-vocab-main-v1',3);const db=await new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
@@ -169,7 +212,7 @@ try{
  assert.equal(await previousRestore.evaluate(()=>currentQuestion.questionInstanceId),draftId);
  await previousRestore.evaluate(()=>{
    persistActiveSession();const key='rikkyo-uk-vocab:coach-v4',b=JSON.parse(localStorage.getItem(key)),k='rikkyo-uk-vocab:waseda-session';
-   const old=JSON.parse(b.records[k]);old.dataVersion='rikkyo-2024-2026-waseda-v7.6';b.records[k]=JSON.stringify(old);localStorage.setItem(key,JSON.stringify(b));
+   const old=JSON.parse(b.records[k]);old.dataVersion='0.25.0-coverage';b.records[k]=JSON.stringify(old);localStorage.setItem(key,JSON.stringify(b));
  });
  await previousRestore.reload();await previousRestore.locator('#resumeActiveBtn').waitFor();await previousRestore.click('#resumeActiveBtn');
  assert.equal(await previousRestore.inputValue('#typedAnswer'),'par');
@@ -192,7 +235,7 @@ try{
  const offlineContext=await isolatedContext();const offline=await offlineContext.newPage();offline.on('pageerror',e=>errors.push(e.message));
  await offline.goto(url);await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));
  await offline.evaluate(()=>navigator.serviceWorker.ready);
- assert.equal(await offline.evaluate(async()=>!!(await caches.match('/rikkyo-uk-vocab/assets/coach-runtime.js?release=4.1.1&dataset=0.25.0-coverage'))),true);
+ assert.equal(await offline.evaluate(async()=>!!(await caches.match('/rikkyo-uk-vocab/assets/coach-runtime.js?release=4.2.0&dataset=0.26.0-originals'))),true);
  await offline.reload();
  await offline.waitForFunction(()=>navigator.serviceWorker.controller&&window.RikkyoHost&&document.getElementById('audioQuestions'));
  await offlineContext.setOffline(true);await offline.reload();await offline.waitForFunction(()=>window.RikkyoHost&&document.getElementById('audioQuestions'));

@@ -1,12 +1,12 @@
 {
   "appId": "rikkyo-uk-vocab",
-  "dataVersion": "0.25.0-coverage",
+  "dataVersion": "0.26.0-originals",
   "registryVersion": "0.25.0",
   "registryEntityCount": 1058,
   "coreEntityCount": 426,
   "generatedFromPhase": 25,
   "enrichment": "enrichment.json",
-  "enrichmentVersion": "2026-10-17-paper-coverage-v5",
+  "enrichmentVersion": "2026-10-17-original-excerpts-v6",
   "selectionMethod": "uncapped-reviewed-paper-coverage-and-frequency",
   "sourcePapers": [
     "FY24-A",

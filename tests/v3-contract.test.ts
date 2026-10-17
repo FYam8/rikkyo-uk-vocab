@@ -13,7 +13,7 @@ describe("v3 frozen compatibility contract", () => {
     expect(EXPORT_FORMAT_VERSION).toBe(3);
     expect(INDEXED_DB_VERSION).toBe(3);
     expect(EXPORT_FORMAT).toBe("rikkyo-uk-vocab-export/v3");
-    expect(RELEASE_TUPLE.datasetVersion).toBe("0.25.0-coverage");
+    expect(RELEASE_TUPLE.datasetVersion).toBe("0.26.0-originals");
   });
 
   it("pins a vendored Common Engine instead of hotlinking Waseda Pages", () => {
