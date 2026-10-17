@@ -1,4 +1,4 @@
-const RELEASE = "4.1.0--waseda-vocabulary-7.6--0.25.0-coverage--e2026-10-17-r5--p3--cloud1";
+const RELEASE = "4.1.1--waseda-vocabulary-7.6--0.25.0-coverage--e2026-10-17-r5--p3--cloud1";
 const CACHE_NAME = `rikkyo-uk-vocab-${RELEASE}`;
 const SCOPE = "/rikkyo-uk-vocab/";
 
@@ -9,12 +9,12 @@ async function buildAtomicCache() {
   if (!releaseResponse.ok || !dataResponse.ok || !indexResponse.ok) throw new Error("RELEASE_TUPLE_FETCH_FAILED");
   const release = await releaseResponse.clone().json();
   const data = await dataResponse.clone().json();
-  if (release.productVersion !== "4.1.0" || release.engineVersion !== "waseda-vocabulary/7.6" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
+  if (release.productVersion !== "4.1.1" || release.engineVersion !== "waseda-vocabulary/7.6" || release.datasetVersion !== data.dataVersion || release.persistenceSchemaVersion !== 3 || release.enrichmentVersion !== data.enrichmentVersion) {
     throw new Error("RELEASE_TUPLE_MISMATCH");
   }
   const html = await indexResponse.clone().text();
   const assetPaths = [...html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)].map((m) => new URL(m[1], self.location.origin + SCOPE).pathname);
-  const urls = [SCOPE, `${SCOPE}assets/coach-runtime.js`, `${SCOPE}data/coach.json`, `${SCOPE}release-manifest.json`, `${SCOPE}data/manifest.json`, `${SCOPE}data/registry.json`, `${SCOPE}data/${data.enrichment}`,
+  const urls = [SCOPE, `${SCOPE}assets/coach-runtime.js`, `${SCOPE}assets/coach-runtime.js?release=${encodeURIComponent(release.productVersion)}&dataset=${encodeURIComponent(data.dataVersion)}`, `${SCOPE}data/coach.json`, `${SCOPE}release-manifest.json`, `${SCOPE}data/manifest.json`, `${SCOPE}data/registry.json`, `${SCOPE}data/${data.enrichment}`,
     ...data.chunks.map((name) => `${SCOPE}data/${name}`), `${SCOPE}manifest.webmanifest`, ...assetPaths];
   const cache = await caches.open(CACHE_NAME);
   await cache.addAll([...new Set(urls)]);

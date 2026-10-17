@@ -4,7 +4,7 @@
 
 ## 現在動作しているアプリ
 
-現行は4.1.0の早稲田アプリ移植版です。src/coach/bootstrap.jsを入口に、vendor/wasedaの出題・採点・習得・復習・画面処理を使います。waseda-app.lock.jsonに固定した早稲田の16ファイルをCIで照合します。
+現行は4.1.1の早稲田アプリ移植版です。src/coach/bootstrap.jsを入口に、vendor/wasedaの出題・採点・習得・復習・画面処理を使います。waseda-app.lock.jsonに固定した早稲田の16ファイルをCIで照合します。
 
 - 学習語彙：426項目（Foundation 41 / Core 316 / Challenge 69）。241項目の固定枠は廃止
 - 語彙データ：FY24〜FY26 A/Bの冊子出現309・文法の出題対象5・発展語112。既存のstable IDと学習履歴を維持
