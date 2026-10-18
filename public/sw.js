@@ -1,4 +1,4 @@
-const RELEASE = "4.3.0--waseda-vocabulary-7.6--0.26.0-originals--e2026-10-17-r6--p3--cloud1";
+const RELEASE = "4.3.0--waseda-vocabulary-7.6--0.26.0-originals--e2026-10-17-r6--p3--answers1";
 const CACHE_NAME = `rikkyo-uk-vocab-${RELEASE}`;
 const SCOPE = "/rikkyo-uk-vocab/";
 

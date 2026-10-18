@@ -11,3 +11,5 @@ export function buildStateRecords(s){
 }
 export function buildOccurrenceRecords(s){return words(s).filter(x=>attempts(x)>0).map(x=>({sourceRecordId:'word:'+x.id,eventType:'vocab_word_state',occurredAt:iso(x.lastStudied)||'1970-01-01T00:00:00.000Z',payload:{kind:'mastery-'+Math.max(0,Math.min(4,Number(x.mastery)||0)),completed:Number(x.mastery)===4,...(iso(x.lastStudied)?{lastLearningAt:iso(x.lastStudied)}:{clockUnknown:true})}}));}
 export function buildBaseline(s){const rows=words(s);return{baseline:true,eventCount:rows.reduce((n,x)=>n+attempts(x),0),eventsByYear:{},capturedAt:new Date().toISOString(),progressLabel:'英単語の学習記録',completedCount:rows.filter(x=>Number(x.mastery)===4&&attempts(x)>0).length,totalCount:rows.filter(x=>attempts(x)>0).length};}
+
+export function buildAnswerRecords(s){return (s?.cloudAnswers||[]).map(r=>globalThis.SHARED_ANSWER_RECORD.answerRecord(r.id,r.at,r)).filter(Boolean);}

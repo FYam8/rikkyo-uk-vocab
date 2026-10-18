@@ -1,3 +1,4 @@
+import '../progress/answer-record.js';
 import curriculum from '../../public/data/manifest.json';
 import release from '../../public/release-manifest.json';
 import { WORD_TIERS } from '../progress/tiers.js';
@@ -108,7 +109,7 @@ async function boot(){
   };
   window.RikkyoHost=host;
   window.addEventListener('storage',event=>{if(event.key===KEY)location.reload()});
-  const script=document.createElement('script');script.src=import.meta.env.BASE_URL+'assets/coach-runtime.js?release='+encodeURIComponent(release.productVersion)+'&dataset='+encodeURIComponent(curriculum.dataVersion);
+  const script=document.createElement('script');script.src=import.meta.env.BASE_URL+'assets/coach-runtime.js?release='+encodeURIComponent(release.productVersion)+'&dataset='+encodeURIComponent(curriculum.dataVersion)+'&answers=1';
   await new Promise((resolve,reject)=>{script.onload=resolve;script.onerror=()=>reject(new Error('アプリを読み込めませんでした'));document.body.append(script)});
   // Optional summary sync starts after the unchanged learning engine is ready.
   void import('../progress/progressSync.js').then(module=>module.init()).catch(()=>{});

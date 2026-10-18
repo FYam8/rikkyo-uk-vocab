@@ -212,3 +212,15 @@ init=function(){
  const hydrate=hydrateUiFromState;hydrateUiFromState=function(){hydrate();updateYear()};
  $('modeSelect').addEventListener('change',updateYear);updateYear();
 };
+
+// Observe the committed question; never change grading, scheduling or queue order.
+(function(){const original=v75UpsertQuestionHistory;v75UpsertQuestionHistory=function(){
+ original();const q=currentQuestion;if(!q?.submitted||!q.questionInstanceId||!q.v)return;
+ const selected=q.selectedChoiceId?VOCAB_BY_ID.get(q.selectedChoiceId):null;
+ const choice=['choice','reverseChoice','audioChoice'].includes(q.type),reverse=q.type==='reverseChoice';
+ const answer=choice?(reverse?selected?.word:selected?.meaning)||q.selectedChoiceId:q.userAnswer;
+ state.cloudAnswers=Array.isArray(state.cloudAnswers)?state.cloudAnswers:[];
+ if(state.cloudAnswers.some(r=>r.id===q.questionInstanceId))return;
+ state.cloudAnswers.push({id:q.questionInstanceId,at:new Date().toISOString(),questionId:q.v.id,questionLabel:q.v.word,questionText:reverse?q.v.meaning:choice?q.v.word:(EXAM_EXAMPLES[q.v.id]?.sentence||q.v.word),answerText:answer===undefined?undefined:String(answer),expectedText:choice&&!reverse?q.v.meaning:q.v.word,outcome:typeof q.ok==='boolean'?(q.ok?'correct':'wrong'):'ungraded',gradingMethod:'客観採点',mode:q.type});
+ saveState();window.dispatchEvent(new Event('learning-answer-saved'));
+};})();

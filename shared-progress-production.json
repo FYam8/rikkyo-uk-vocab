@@ -1,50 +1,41 @@
 {
   "repository": "FYam8/waseshibu-progress-cloud",
-  "commit": "25c111ed4fc4dcd76b9af5053d6039698271e340",
-  "tag": "progress-prod-20261003-25c111e",
+  "commit": "aaabf233652963738d2b6e17301594b51b8e3d95",
+  "tag": "git-aaabf2336529",
   "productionVerified": true,
-  "workerVersion": "d4bfb631-d857-444f-9a20-72c49a73e2dc",
-  "workerDeployment": "dc34300d-31b8-44c3-930c-a06b9cd9f8e9",
-  "manifestSha256": "cfff01529f5f71871c5ba3c323b1c9240ca03a24bbd7aaaf30d59263cb52d082",
+  "workerVersion": "4a711163-eacd-4562-9aa7-17e8fc48d8fe",
+  "workerDeployment": "4a711163-eacd-4562-9aa7-17e8fc48d8fe",
+  "manifestSha256": "90b914fbeafe8d144611c17fc143e40615c5828f59edc53498d01e3547b428d6",
   "files": {
     "src/accessConfig.js": "86441e106ff858c462d00fedaa5d56f7622dc6d9d6735dcfda92282a15af407d",
-    "src/client/progress-transport.js": "9edfe701a45da206ad2b3da120329e5a0571828f89976bc7eb51f6bead87298d",
-    "src/dashboard.js": "5368e50439b6ca60bea1c8068aea747dde24dc8b8a0383c598a741c1aa0cddab",
+    "src/answerContract.js": "a30645f6a6455add5172e8fa71d5b1da9cce2917bea4ac29b5295cf08926ab84",
+    "src/client/answer-record.js": "5d59a85e2b55fa505abe75b98bd8f5caf0921ff5758987877e42f8ada342d6fa",
+    "src/client/progress-transport.js": "db967f2e3caebef658839591dbaf39217d210a600c97a5e5bdcbead359a2a9fd",
+    "src/dashboard.js": "d88325be4fffba52e52966d23e6d83cbf3db3d7147b15837c08dff9c72a522cf",
     "src/dashboardFormatting.js": "03c2c8b96f3a6868274876d74490d5f1996d0575e3d485701f02cfe1a59c87ed",
+    "src/indexV10.js": "11f93f4b56b6d56d7938cf0ac9318203cce9ccaa92665fe33a918d723074f6b6",
     "src/indexV2.js": "00c72fc7c47bd8d1ba47161491fcf9207cfb2877412c773dd9e6ac1aa634d0c3",
     "src/indexV3.js": "ec4541f06e4012b9ed0544b4959909e1f79ad7f44941fce68e41747331d7afdf",
-    "src/indexV4.js": "4e424a66658fe9d45fd202463479238923dfea54ad3dfadccc897bd61dbb8b31",
-    "src/indexV5.js": "49bad9819b557460c286b31ae6d350cc731fc08f5d4202bb596fbd1a39ecf5b8",
-    "src/indexV6.js": "aed38f4320b4e16392c1cb86404b4b8e56b8604ac4bf1befd5f29c35621a3e13",
+    "src/indexV4.js": "472f5ec11f5f3558190ca724289eb89b370b4584e7b7d67f7dc6af1a306ec595",
+    "src/indexV5.js": "64eac50184b47464ff6c5ff8f2f16491fc8b56aeaf7ae9c5fc4e46bbc396ea14",
+    "src/indexV6.js": "4a64ecb5db0c3c5d9178208784d418f65412388f88b58cb495e7a09e876e4568",
     "src/indexV7.js": "dfc0bdab4773d388accd904716280b1cc920142403551404bae143ae5352111b",
     "src/indexV8.js": "f7caf6d2d5e46918d54bc6d031814ddbf9170f73937d4e73d47fe1d889b1fef3",
     "src/indexV9.js": "c6e16503dd7318d1a39817967d07c53543803abeb1bfd6e4cd058ba1caeed0f9",
     "src/platformConfig.js": "f9b9547df2d17924485e1cf619382dc26f571dad079649bd13086a72d13c5bdb",
     "src/progressContract.js": "e90bb69bc75ef56fff363426bfc1a0b742ce6a08b7e91c651008019c35f01f88"
   },
-  "waseClients": {
-    "waseshibu-english": "02b64840b3bdb5bf2e9a8fe079ec4ad2972627f3",
-    "waseshibu-math": "d8ef4b05d34fd70ef02d6ea6ccc9b9f5cea2878d",
-    "waseshibu-source": "614feda08d33ae4355750af6aca14151de4e4f74",
-    "english-vocab": "ead3af597ff0dfb1e9f39d496b8f5b82ae31dbc6"
-  },
   "verification": {
     "cleanRounds": [
       1,
       2
     ],
-    "checksPerRound": 180,
-    "cloudMainCi": 37064995749,
-    "kokugoMainCi": 37061002501,
-    "kokugoPublish": 37061423225,
-    "kokugoLiveAudit": 37061496267,
-    "productionUi": "390px touch and 1280px; all four apps; cloud writes intercepted",
-    "liveWorkerModules": 15,
+    "cloudMainCi": 39114985749,
     "liveWorkerModulesMatch": true,
-    "cleanCandidate": "4f2427458c084e14ed18843335ce6c8f8c72d206"
+    "browser": "390px and 1280px; 4 subjects; submitted answer and shared-device checks; admin XSS escaping"
   },
-  "verifiedAt": "2026-10-02T21:12:35.824Z",
+  "verifiedAt": "2026-10-18T09:23:10Z",
   "sourcePath": "src/client/progress-transport.js",
   "localPath": "src/progress/shared-progress-transport.js",
-  "sha256": "9edfe701a45da206ad2b3da120329e5a0571828f89976bc7eb51f6bead87298d"
+  "sha256": "db967f2e3caebef658839591dbaf39217d210a600c97a5e5bdcbead359a2a9fd"
 }
